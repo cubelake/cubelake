@@ -7,8 +7,10 @@ requires-python = ">=3.13"
 dependencies = [
     "ingestion-apple-rss",
     "ingestion-apple-itunes",
+    "appstore-models"
 ]
 
 [tool.uv.sources]
 ingestion-apple-rss = { workspace = true }
 ingestion-apple-itunes = { workspace = true }
+appstore-models = { workspace = true }
