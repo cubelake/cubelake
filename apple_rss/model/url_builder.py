@@ -1,23 +1,5 @@
-from enum import StrEnum
-
 from pydantic import BaseModel
-
-
-class FeedType(StrEnum):
-    TOP_FREE = "top-free"
-    TOP_PAID = "top-paid"
-
-
-class MediaType(StrEnum):
-    APPS = "apps"
-
-
-class SchemaType(StrEnum):
-    APPS = "apps"
-
-
-class ResponseFormat(StrEnum):
-    JSON = "json"
+from url_params import FeedType, MediaType, ResponseFormat, SchemaType
 
 
 # https://rss.marketingtools.apple.com/api/v2/no/apps/top-free/100/apps.json

@@ -4,4 +4,6 @@ Version: 0.1.0
 Summary: Add your description here
 Requires-Python: >=3.13
 Description-Content-Type: text/markdown
+Requires-Dist: loguru>=0.7.3
+Requires-Dist: pycountry>=26.2.16
 Requires-Dist: pydantic>=2.13.0
