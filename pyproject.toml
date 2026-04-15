@@ -5,10 +5,10 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "appstore-models",
+    "appstore-core",
     "httpx>=0.28.1",
     "loguru>=0.7.3",
 ]
 
 [tool.uv.sources]
-appstore-models = { workspace = true }
+appstore-core = { workspace = true }
