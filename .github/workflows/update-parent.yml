@@ -1,4 +1,4 @@
-name: Update parent repo (cubelacke)
+name: Update parent repo (cubelake)
 
 on:
   push:
@@ -11,7 +11,7 @@ jobs:
       - name: Checkout parent repo
         uses: actions/checkout@v4
         with:
-          repository: Cubelacke/cubelacke
+          repository: Cubelake/cubelake
           token: ${{ secrets.PARENT_REPO_TOKEN }}
           submodules: true
           fetch-depth: 0
