@@ -1,0 +1,32 @@
+{
+    "feed": {
+        "title": "Top Free Apps",
+        "id": "https: //rss.marketingtools.apple.com/api/v2/no/apps/top-free/100/apps.json",
+        "author": {
+            "name": "Apple",
+            "url": "https://www.apple.com/"
+        },
+        "links": [
+            {
+                "self": "https://rss.marketingtools.apple.com/api/v2/no/apps/top-free/100/apps.json"
+            }
+        ],
+        "copyright": "Copyright © 2026 Apple Inc. All rights reserved.",
+        "country": "no",
+        "icon": "https://www.apple.com/favicon.ico",
+        "updated": "Wed, 28 Jan 2026 15:17:10 +0000",
+        "results": [
+            {
+                "artistName": "Time Park AS",
+                "id": "6479996851",
+                "name": "Time Park FIX",
+                "releaseDate": "2024-05-13",
+                "kind": "apps",
+                "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/5d/2e/2e/5d2e2eb0-ce6a-28fa-6a44-e905e100dc89/AppIcon-timeParkProd-1x_U007emarketing-0-11-0-0-85-220-0.png/100x100bb.png",
+                "genres": [],
+                "url": "https://apps.apple.com/no/app/time-park-fix/id6479996851"
+            }
+        ],
+        "url": "https://apps.apple.com/no/app/lyfta-gym-tracker-planner/id6443740936"
+    }
+}

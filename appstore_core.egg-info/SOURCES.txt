@@ -1,0 +1,8 @@
+README.md
+pyproject.toml
+apple_rss/model/url_builder.py
+appstore_core.egg-info/PKG-INFO
+appstore_core.egg-info/SOURCES.txt
+appstore_core.egg-info/dependency_links.txt
+appstore_core.egg-info/requires.txt
+appstore_core.egg-info/top_level.txt
