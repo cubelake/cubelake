@@ -1,0 +1,34 @@
+name: Update parent repo (cubelacke)
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  update-submodule:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout parent repo
+        uses: actions/checkout@v4
+        with:
+          repository: Cubelacke/cubelacke
+          token: ${{ secrets.PARENT_REPO_TOKEN }}
+          submodules: true
+          fetch-depth: 0
+
+      - name: Update appstore-core submodule to latest
+        run: |
+          cd appstore-core
+          git fetch origin main
+          git checkout origin/main
+          cd ..
+
+      - name: Commit and push
+        run: |
+          git config user.name "LASKAV"
+          git config user.email "mksidoops@gmail.com"
+          git add appstore-core
+          # Only commit if there are changes
+          git diff --cached --quiet && echo "No changes" && exit 0
+          git commit -m "Update appstore-core submodule to $(cd appstore-core && git rev-parse --short HEAD)"
+          git push
