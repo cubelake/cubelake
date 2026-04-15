@@ -1,0 +1,33 @@
+name: Update parent repo (cubelacke)
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  update-submodule:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout parent repo
+        uses: actions/checkout@v4
+        with:
+          repository: Cubelacke/cubelacke
+          token: ${{ secrets.PARENT_REPO_TOKEN }}
+          submodules: true
+          fetch-depth: 0
+
+      - name: Update infra submodule to latest
+        run: |
+          cd infra
+          git fetch origin main
+          git checkout origin/main
+          cd ..
+
+      - name: Commit and push
+        run: |
+          git config user.name "LASKAV"
+          git config user.email "mksidoops@gmail.com"
+          git add infra
+          git diff --cached --quiet && echo "No changes" && exit 0
+          git commit -m "Update infra submodule to $(cd infra && git rev-parse --short HEAD)"
+          git push
