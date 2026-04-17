@@ -1,0 +1,10 @@
+README.md
+ingestion_config.py
+main.py
+pyproject.toml
+url_factory.py
+ingestion_apple_rss.egg-info/PKG-INFO
+ingestion_apple_rss.egg-info/SOURCES.txt
+ingestion_apple_rss.egg-info/dependency_links.txt
+ingestion_apple_rss.egg-info/requires.txt
+ingestion_apple_rss.egg-info/top_level.txt
