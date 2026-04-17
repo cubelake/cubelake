@@ -1,17 +1,7 @@
-from pydantic import BaseModel
-from url_params import FeedType, MediaType, ResponseFormat, SchemaType
+from apple_rss.model.url_params import AppleUrlParams
 
 
 # https://rss.marketingtools.apple.com/api/v2/no/apps/top-free/100/apps.json
-class AppleUrlParams(BaseModel):
-    country: str
-    media_type: MediaType = MediaType.APPS
-    feed_type: FeedType
-    limit: int
-    schema_type: SchemaType = SchemaType.APPS
-    response_format: ResponseFormat = ResponseFormat.JSON
-
-
 class AppleUrlBuilder:
     BASE_URL = "https://rss.marketingtools.apple.com/api/v2"
 

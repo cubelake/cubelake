@@ -1,6 +1,9 @@
 README.md
 pyproject.toml
+apple_rss/model/metadata.py
+apple_rss/model/supported_countries.py
 apple_rss/model/url_builder.py
+apple_rss/model/url_params.py
 appstore_core.egg-info/PKG-INFO
 appstore_core.egg-info/SOURCES.txt
 appstore_core.egg-info/dependency_links.txt
