@@ -10,5 +10,11 @@ dependencies = [
     "loguru>=0.7.3",
 ]
 
+[tool.setuptools]
+py-modules = ["url_factory", "ingestion_config", "main"]
+
 [tool.uv.sources]
 appstore-core = { workspace = true }
+
+[tool.ty.environment]
+extra-paths = ["../appstore-core"]
