@@ -1,0 +1,34 @@
+name: Update parent repo (cubelake)
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  update-submodule:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout parent repo
+        uses: actions/checkout@v4
+        with:
+          repository: Cubelake/cubelake
+          token: ${{ secrets.PARENT_REPO_TOKEN }}
+          submodules: true
+          fetch-depth: 0
+
+      - name: Update appstore-dags submodule to latest
+        run: |
+          cd appstore-dags
+          git fetch origin main
+          git checkout origin/main
+          cd ..
+
+      - name: Commit and push
+        run: |
+          git config user.name "LASKAV"
+          git config user.email "mksidoops@gmail.com"
+          git add appstore-dags
+          # Only commit if there are changes
+          git diff --cached --quiet && echo "No changes" && exit 0
+          git commit -m "Update appstore-dags submodule to $(cd appstore-dags && git rev-parse --short HEAD)"
+          git push
