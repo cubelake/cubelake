@@ -1,8 +1,9 @@
 README.md
-ingestion_config.py
-main.py
 pyproject.toml
-url_factory.py
+ingestion_apple_rss/__init__.py
+ingestion_apple_rss/ingestion_config.py
+ingestion_apple_rss/ingestor.py
+ingestion_apple_rss/url_factory.py
 ingestion_apple_rss.egg-info/PKG-INFO
 ingestion_apple_rss.egg-info/SOURCES.txt
 ingestion_apple_rss.egg-info/dependency_links.txt

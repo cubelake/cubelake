@@ -3,8 +3,8 @@ import asyncio
 import httpx
 from loguru import logger
 
-from ingestion_config import IngestionConfig
-from url_factory import UrlFactory
+from ingestion_apple_rss.ingestion_config import IngestionConfig
+from ingestion_apple_rss.url_factory import UrlFactory
 
 
 class Ingestor:
@@ -100,8 +100,8 @@ class Ingestor:
                 continue
             key = self._url_key_map[url]
             for record in self.normalize(raw):
-                # fix append records params 
-                records.append({"preset_key": key, "url": url, "payload": record})
+                records.append({"preset_key": key, "url": url, "feed": record})
 
         logger.info("Collected {}/{} URLs", len(records), len(urls))
+        logger.info(records)
         return records
