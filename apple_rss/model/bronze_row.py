@@ -1,12 +1,21 @@
 from pydantic import BaseModel
 
 from apple_rss.model.metadata import BronzeMetadata
+from apple_rss.model.path_coords import BronzePathCoords
 
 
 class BronzeRow(BaseModel):
     feed: dict
     metadata: BronzeMetadata
+    path_coords: BronzePathCoords
 
     @classmethod
-    def create(cls, feed: dict, metadata: BronzeMetadata) -> "BronzeRow":
-        return cls(feed=feed, metadata=metadata)
+    def from_raw(cls, feed: dict, source: str, preset_key: str) -> "BronzeRow":
+        return cls(
+            feed=feed,
+            metadata=BronzeMetadata.create(source=source),
+            path_coords=BronzePathCoords.from_preset_key(preset_key),
+        )
+
+    def to_record(self) -> dict:
+        return {**self.metadata.model_dump(by_alias=True), **self.feed}

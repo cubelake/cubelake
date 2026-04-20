@@ -9,3 +9,10 @@ dependencies = [
     "pycountry>=26.2.16",
     "pydantic>=2.13.0",
 ]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["apple_rss*"]
+
+[tool.setuptools.package-data]
+"apple_rss.data_schema" = ["*.json"]
