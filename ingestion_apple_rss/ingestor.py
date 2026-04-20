@@ -103,5 +103,4 @@ class Ingestor:
                 records.append({"preset_key": key, "url": url, "feed": record})
 
         logger.info("Collected {}/{} URLs", len(records), len(urls))
-        logger.info(records)
         return records

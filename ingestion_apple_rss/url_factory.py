@@ -13,7 +13,7 @@ class UrlFactory:
 
     @classmethod
     def get_url_for(cls, country: str, feed: FeedType) -> str:
-        params = AppleUrlParams(country=country, feed_type=feed, limit=1)
+        params = AppleUrlParams(country=country, feed_type=feed, limit=100)
         return AppleUrlBuilder.build_url(params)
 
     @classmethod
