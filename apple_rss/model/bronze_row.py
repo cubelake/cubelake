@@ -13,7 +13,7 @@ class BronzeRow(BaseModel):
     def from_raw(cls, feed: dict, source: str, preset_key: str) -> "BronzeRow":
         return cls(
             feed=feed,
-            metadata=BronzeMetadata.create(source=source),
+            metadata=BronzeMetadata.create(source=source,preset_key=preset_key),
             path_coords=BronzePathCoords.from_preset_key(preset_key),
         )
 
