@@ -20,14 +20,14 @@ SOURCE_NAME = "ingestion-apple"
 
 
 @dag(
-    dag_id="bronze_top_country_pipeline",
+    dag_id="bronze_top_daily",
     default_args=bronze_args,
     schedule="@daily",
     max_active_runs=1,
     catchup=False,
     tags=["bronze", "country", "rss", "daily"],
 )
-def bronze_top_country_pipeline() -> None:
+def bronze_top_daily() -> None:
     @task(task_id="collect_data")
     def collect_data() -> list[dict]:
         collector = Ingestor()
@@ -80,7 +80,9 @@ def bronze_top_country_pipeline() -> None:
             )
             directory_client = file_system.get_directory_client(path.directory)
             file_client = directory_client.get_file_client(path.file_name)
-            data = (json.dumps(row["record"], ensure_ascii=False) + "\n").encode("utf-8")
+            data = (json.dumps(row["record"], ensure_ascii=False) + "\n").encode(
+                "utf-8"
+            )
             file_client.upload_data(data, overwrite=True)
 
     data = collect_data()
@@ -88,4 +90,4 @@ def bronze_top_country_pipeline() -> None:
     load_to_adls(rows)
 
 
-bronze_apple_rss_dag = bronze_top_country_pipeline()
+bronze_dag = bronze_top_daily()
