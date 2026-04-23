@@ -20,6 +20,8 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 
 # Copy only the workspace packages needed by appstore-dags
+# appstore-transform pyproject.toml is needed for uv workspace resolution even though it's not installed
+COPY appstore-transform/pyproject.toml ./appstore-transform/pyproject.toml
 COPY appstore-core ./appstore-core
 COPY ingestion-apple-rss ./ingestion-apple-rss
 COPY ingestion-apple-itunes ./ingestion-apple-itunes
