@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
-from apple_rss.model.metadata import BronzeMetadata
-from apple_rss.model.path_coords import BronzePathCoords
+from apple_rss.storage.metadata import BronzeMetadata
+from apple_rss.storage.path_coords import BronzePathCoords
 
 
 class BronzeRow(BaseModel):
