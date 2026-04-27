@@ -23,11 +23,13 @@ x-airflow-common:
     PYTHONPATH: /app:/opt/airflow
     _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
     AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
+    DBT_PROJECT_DIR: '/opt/airflow/dbt/appstore-transform'
   volumes:
     - ${AIRFLOW_PROJ_DIR:-../../appstore-dags}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:-../../appstore-dags}/logs:/opt/airflow/logs
     - ${AIRFLOW_PROJ_DIR:-../../appstore-dags}/config:/opt/airflow/config
     - ${AIRFLOW_PROJ_DIR:-../../appstore-dags}/plugins:/opt/airflow/plugins
+    - ${DBT_TRANSFORM_DIR:-../../appstore-transform}:/opt/airflow/dbt/appstore-transform
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on
