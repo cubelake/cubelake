@@ -1,13 +1,13 @@
 import asyncio
 import json
-import os
-from typing import Any, cast
+from typing import Any
 
 from airflow.sdk import Asset, dag, get_current_context, task
-from apple_rss.model.bronze_row import BronzeRow
+from apple_rss.storage import RssBronzeToken
 from apple_rss.storage.bronze_path import AdlsBronzeStoragePath
-from apple_rss.storage.containers import ADLS_BRONZE_CONTAINER
-from azure.storage.filedatalake import DataLakeServiceClient
+from apple_rss.storage.bronze_row import BronzeRow
+from azure.storage.filedatalake import DataLakeDirectoryClient
+from common.storage.containers import ADLS_BRONZE_CONTAINER
 from ingestion_apple_rss.ingestor import Ingestor
 
 from dags.utils.default_args import bronze_args
@@ -16,7 +16,7 @@ from dags.utils.logging import configure_loguru
 configure_loguru()
 
 BRONZE_APPSTORE_RSS = Asset("azure://bronze/appstore_rss")
-SOURCE_NAME = "ingestion-apple"
+SOURCE_NAME = "ingestion-apple-rss"
 
 
 @dag(
@@ -29,65 +29,47 @@ SOURCE_NAME = "ingestion-apple"
 )
 def bronze_top_daily() -> None:
     @task(task_id="collect_data")
-    def collect_data() -> list[dict]:
-        collector = Ingestor()
-        return asyncio.run(collector.collect())
+    def collect_data() -> int:
+        token = RssBronzeToken()
 
-    @task(task_id="build_bronze_rows")
-    def build_bronze_rows(data: Any) -> list[dict]:
-        data_typed = cast(list[dict], data)
-        rows = []
-        for item in data_typed:
+        context = get_current_context()
+        logical_date = context.get("logical_date") or context.get("data_interval_start")
+        if logical_date is None:
+            raise RuntimeError("No execution date available in context")
+        snapshot_date = logical_date.date().isoformat()
+
+        results = asyncio.run(Ingestor().collect())
+
+        base_dir = DataLakeDirectoryClient(
+            account_url=token.account_url,
+            file_system_name=ADLS_BRONZE_CONTAINER,
+            directory_name="appstore_rss",
+            credential=token.sas_token,
+        )
+        snapshot_dir = base_dir.get_sub_directory_client(f"snapshot_date={snapshot_date}")
+
+        for item in results:
             bronze_row = BronzeRow.from_raw(
                 feed=item.get("feed") or {},
                 source=SOURCE_NAME,
                 preset_key=item.get("preset_key", ""),
             )
-            rows.append(
-                {
-                    "record": bronze_row.to_record(),
-                    "path_coords": bronze_row.path_coords.model_dump(),
-                }
-            )
-        return rows
-
-    @task(task_id="load_to_adls", outlets=[BRONZE_APPSTORE_RSS])
-    def load_to_adls(rows: Any) -> None:
-        rows_typed = cast(list[dict], rows)
-
-        try:
-            account_url = os.environ["ACCOUNT_URL"]
-            sas_token = os.environ["BRONZE_SAS_TOKEN"]
-        except KeyError as e:
-            raise RuntimeError(f"Required environment variable not set: {e}") from e
-
-        context = get_current_context()
-        data_interval_start = context["data_interval_start"]
-        if data_interval_start is None:
-            raise RuntimeError("data_interval_start is not available in context")
-        snapshot_date = data_interval_start.date().isoformat()
-
-        service_client = DataLakeServiceClient(
-            account_url=account_url,
-            credential=sas_token,
-        )
-        file_system = service_client.get_file_system_client(ADLS_BRONZE_CONTAINER)
-
-        for row in rows_typed:
             path = AdlsBronzeStoragePath(
                 snapshot_date=snapshot_date,
-                **row["path_coords"],
+                **bronze_row.path_coords.model_dump(),
             )
-            directory_client = file_system.get_directory_client(path.directory)
-            file_client = directory_client.get_file_client(path.file_name)
-            data = (json.dumps(row["record"], ensure_ascii=False) + "\n").encode(
-                "utf-8"
-            )
-            file_client.upload_data(data, overwrite=True)
+            file_client = snapshot_dir.get_file_client(path.file_name)
+            payload = (json.dumps(bronze_row.to_record(), ensure_ascii=False) + "\n").encode("utf-8")
+            file_client.upload_data(payload, overwrite=True)
 
-    data = collect_data()
-    rows = build_bronze_rows(data)
-    load_to_adls(rows)
+        return len(results)
+
+    @task(task_id="load_to_adls", outlets=[BRONZE_APPSTORE_RSS])
+    def load_to_adls(files_written: Any) -> None:
+        pass
+
+    files_written = collect_data()
+    load_to_adls(files_written)
 
 
 bronze_dag = bronze_top_daily()

@@ -10,6 +10,7 @@ dependencies = [
     "appstore-core",
     "apache-airflow>=3.2.0",
     "azure-storage-file-datalake>=12.23.0",
+    "duckdb>=1.2.0",
 ]
 
 [tool.uv.sources]
@@ -18,4 +19,4 @@ ingestion-apple-itunes = { workspace = true }
 appstore-core = { workspace = true }
 
 [tool.ty.environment]
-extra-paths = ["../appstore-core", "../ingestion-apple-rss"]
+extra-paths = ["../appstore-core", "../ingestion-apple-rss", "../ingestion-apple-itunes"]
