@@ -4,3 +4,4 @@ logs/
 *.duckdb
 profiles.yml
 .env
+dbt_internal_packages/

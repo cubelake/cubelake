@@ -5,22 +5,33 @@ config-version: 2
 profile: appstore_transform
 
 model-paths: ["models"]
-seed-paths: ["seeds"]
-snapshot-paths: ["snapshots"]
 macro-paths: ["macros"]
-analysis-paths: ["analyses"]
 test-paths: ["tests"]
 
 target-path: "target"
-clean-targets: ["target", "dbt_packages"]
+clean-targets: ["target"]
+
+on-run-start:
+  - >
+    CREATE OR REPLACE SECRET bronze_secret (
+      TYPE AZURE,
+      SCOPE 'azure://bronze',
+      CONNECTION_STRING 'AccountName={{ env_var("ACCOUNT_NAME") }};SharedAccessSignature={{ env_var("BRONZE_SAS_TOKEN") }}'
+    );
+  - >
+    CREATE OR REPLACE SECRET silver_secret (
+      TYPE AZURE,
+      SCOPE 'azure://silver',
+      CONNECTION_STRING 'AccountName={{ env_var("ACCOUNT_NAME") }};SharedAccessSignature={{ env_var("SILVER_SAS_TOKEN") }}'
+    );
 
 models:
   appstore_transform:
     staging:
-      materialized: view
+      materialized: table
       schema: staging
     intermediate:
-      materialized: view
+      materialized: table
       schema: intermediate
     marts:
       materialized: table
