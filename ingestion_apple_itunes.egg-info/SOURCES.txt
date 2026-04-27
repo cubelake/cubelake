@@ -1,6 +1,8 @@
 README.md
-main.py
 pyproject.toml
+ingestion_apple_itunes/__init__.py
+ingestion_apple_itunes/ingestor.py
+ingestion_apple_itunes/url_factory.py
 ingestion_apple_itunes.egg-info/PKG-INFO
 ingestion_apple_itunes.egg-info/SOURCES.txt
 ingestion_apple_itunes.egg-info/dependency_links.txt
