@@ -12,7 +12,6 @@ class SupportedCountries:
     def load_countries(cls) -> tuple[str, ...]:
         resource = files("apple_rss.data_schema").joinpath(cls.FILE_NAME)
         if resource.is_file():
-            logger.info(f"Loading countries from {cls.FILE_NAME}")
             return tuple(json.loads(resource.read_text(encoding="utf-8")))
         else:
             logger.warning(f"Country file {cls.FILE_NAME} not found, using pycountry")
