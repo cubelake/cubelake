@@ -1,9 +1,9 @@
 import asyncio
 import json
-from typing import Any, cast
 
 import duckdb
-from airflow.sdk import Asset, dag, get_current_context, task
+from airflow.sdk import Asset, dag, task
+from airflow.sdk.exceptions import AirflowSkipException
 from apple_itunes.storage import ItunesBronzeToken
 from apple_rss.storage import RssSilverToken
 from dags.silver.apple_rss.transform_top_daily import SILVER_APPSTORE_RSS
@@ -31,9 +31,52 @@ SOURCE_NAME = "ingestion-apple-itunes"
     tags=["bronze", "country", "itunes", "daily"],
 )
 def bronze_itunes_lookup_daily() -> None:
-    @task(task_id="load_app_ids")
-    def load_app_ids() -> dict[str, list[str]]:
+    @task(task_id="discover_unprocessed_snapshots")
+    def discover_unprocessed_snapshots() -> list[str]:
         silver = RssSilverToken()
+        bronze = ItunesBronzeToken()
+
+        with duckdb.connect() as con:
+            silver.init_connection(con)
+            silver_dates = [
+                str(row[0])
+                for row in con.execute(
+                    f"SELECT DISTINCT snapshot_date "
+                    f"FROM read_parquet("
+                    f"  'azure://{ADLS_SILVER_CONTAINER}/appstore_rss/**/*.parquet',"
+                    f"  hive_partitioning = true"
+                    f") ORDER BY snapshot_date;"
+                ).fetchall()
+            ]
+
+        bronze_dates: set[str] = set()
+        with duckdb.connect() as con:
+            bronze.init_connection(con)
+            try:
+                bronze_dates = {
+                    str(row[0])
+                    for row in con.execute(
+                        f"SELECT DISTINCT snapshot_date "
+                        f"FROM read_json_auto("
+                        f"  'azure://{ADLS_BRONZE_CONTAINER}/appstore_itunes/**/*.json'"
+                        f") ORDER BY snapshot_date;"
+                    ).fetchall()
+                }
+            except duckdb.IOException:
+                pass  # no bronze iTunes data yet
+
+        missing = [d for d in silver_dates if d not in bronze_dates]
+
+        if not missing:
+            raise AirflowSkipException("All silver RSS snapshots already ingested into bronze iTunes")
+
+        return missing
+
+    @task(task_id="collect_data", max_active_tis_per_dagrun=1)
+    def collect_data(snapshot_date: str) -> int:
+        silver = RssSilverToken()
+        token = ItunesBronzeToken()
+
         with duckdb.connect() as con:
             silver.init_connection(con)
             rows = con.execute(
@@ -42,34 +85,15 @@ def bronze_itunes_lookup_daily() -> None:
                 f"  'azure://{ADLS_SILVER_CONTAINER}/appstore_rss/**/*.parquet',"
                 f"  hive_partitioning = true"
                 f") "
-                f"WHERE snapshot_date = ("
-                f"  SELECT MAX(snapshot_date) "
-                f"  FROM read_parquet("
-                f"    'azure://{ADLS_SILVER_CONTAINER}/appstore_rss/**/*.parquet',"
-                f"    hive_partitioning = true"
-                f"  )"
-                f") "
+                f"WHERE snapshot_date = '{snapshot_date}' "
                 f"AND app_id IS NOT NULL "
                 f"ORDER BY app_rank;"
             ).fetchall()
 
-        app_ids_by_key: dict[str, list[str]] = {}
+        ids: dict[str, list[str]] = {}
         for country, feed_type, app_id in rows:
             key = f"{country.lower()}_top_{feed_type.lower()}"
-            app_ids_by_key.setdefault(key, []).append(str(app_id))
-        return app_ids_by_key
-
-    @task(task_id="collect_data")
-    def collect_data(app_ids_by_key: Any) -> int:
-        ids = cast(dict[str, list[str]], app_ids_by_key)
-
-        token = ItunesBronzeToken()
-
-        context = get_current_context()
-        logical_date = context.get("logical_date") or context.get("data_interval_start")
-        if logical_date is None:
-            raise RuntimeError("No execution date available in context")
-        snapshot_date = logical_date.date().isoformat()
+            ids.setdefault(key, []).append(str(app_id))
 
         results = asyncio.run(Ingestor().collect(ids))
 
@@ -98,11 +122,11 @@ def bronze_itunes_lookup_daily() -> None:
         return len(results)
 
     @task(task_id="load_to_adls", outlets=[BRONZE_APPSTORE_ITUNES])
-    def load_to_adls(files_written: Any) -> None:
+    def load_to_adls(files_written: list[int]) -> None:
         pass
 
-    ids = load_app_ids()
-    files_written = collect_data(ids)
+    missing_dates = discover_unprocessed_snapshots()
+    files_written = collect_data.expand(snapshot_date=missing_dates)
     load_to_adls(files_written)
 
 

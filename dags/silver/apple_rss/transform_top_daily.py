@@ -62,7 +62,7 @@ def silver_transform_top_daily():
 
         return missing
 
-    @task(task_id="run_dbt_transform", outlets=[SILVER_APPSTORE_RSS])
+    @task(task_id="run_dbt_transform")
     def run_dbt_transform(snapshot_date: str) -> None:
         bronze = RssBronzeToken()
         silver = RssSilverToken()
@@ -90,8 +90,13 @@ def silver_transform_top_daily():
         if result.returncode != 0:
             raise RuntimeError(f"dbt run failed for {snapshot_date}:\n{result.stdout}\n{result.stderr}")
 
+    @task(task_id="emit_silver_rss_asset", outlets=[SILVER_APPSTORE_RSS])
+    def emit_silver_rss_asset(results: list) -> None:
+        pass
+
     missing_dates = discover_bronze_snapshots()
-    run_dbt_transform.expand(snapshot_date=missing_dates)
+    dbt_done = run_dbt_transform.expand(snapshot_date=missing_dates)
+    emit_silver_rss_asset(dbt_done)
 
 
 silver_transform_top_daily()
