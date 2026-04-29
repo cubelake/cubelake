@@ -9,14 +9,12 @@ from apple_rss.storage import RssSilverToken
 from dags.silver.apple_rss.transform_top_daily import SILVER_APPSTORE_RSS
 from apple_itunes.storage.bronze_path import AdlsBronzeStoragePath
 from apple_itunes.storage.bronze_row import BronzeRow
-from azure.storage.filedatalake import DataLakeDirectoryClient
+from azure.storage.filedatalake import DataLakeDirectoryClient, DataLakeServiceClient
 from common.storage.containers import ADLS_BRONZE_CONTAINER, ADLS_SILVER_CONTAINER
 from ingestion_apple_itunes.ingestor import Ingestor
 
 from dags.utils.default_args import bronze_args
 from dags.utils.logging import configure_loguru
-
-configure_loguru()
 
 BRONZE_APPSTORE_ITUNES = Asset("azure://bronze/appstore_itunes")
 SOURCE_NAME = "ingestion-apple-itunes"
@@ -33,6 +31,7 @@ SOURCE_NAME = "ingestion-apple-itunes"
 def bronze_itunes_lookup_daily() -> None:
     @task(task_id="discover_unprocessed_snapshots")
     def discover_unprocessed_snapshots() -> list[str]:
+        configure_loguru()
         silver = RssSilverToken()
         bronze = ItunesBronzeToken()
 
@@ -49,21 +48,14 @@ def bronze_itunes_lookup_daily() -> None:
                 ).fetchall()
             ]
 
-        bronze_dates: set[str] = set()
-        with duckdb.connect() as con:
-            bronze.init_connection(con)
-            try:
-                bronze_dates = {
-                    str(row[0])
-                    for row in con.execute(
-                        f"SELECT DISTINCT snapshot_date "
-                        f"FROM read_json_auto("
-                        f"  'azure://{ADLS_BRONZE_CONTAINER}/appstore_itunes/**/*.json'"
-                        f") ORDER BY snapshot_date;"
-                    ).fetchall()
-                }
-            except duckdb.IOException:
-                pass  # no bronze iTunes data yet
+        fs = DataLakeServiceClient(
+            account_url=bronze.account_url, credential=bronze.sas_token
+        ).get_file_system_client(ADLS_BRONZE_CONTAINER)
+        bronze_dates: set[str] = {
+            p.name.split("snapshot_date=")[-1]
+            for p in fs.get_paths("appstore_itunes", recursive=False)
+            if p.is_directory and "snapshot_date=" in p.name
+        }
 
         missing = [d for d in silver_dates if d not in bronze_dates]
 
@@ -74,6 +66,7 @@ def bronze_itunes_lookup_daily() -> None:
 
     @task(task_id="collect_data", max_active_tis_per_dagrun=1)
     def collect_data(snapshot_date: str) -> int:
+        configure_loguru()
         silver = RssSilverToken()
         token = ItunesBronzeToken()
 
