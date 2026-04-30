@@ -52,7 +52,7 @@ def silver_transform_itunes_lookup_daily():
 
         return missing
 
-    @task(task_id="run_dbt_transform")
+    @task(task_id="run_dbt_transform", max_active_tis_per_dagrun=4)
     def run_dbt_transform(snapshot_date: str) -> None:
         bronze = ItunesBronzeToken()
         silver = ItunesSilverToken()
