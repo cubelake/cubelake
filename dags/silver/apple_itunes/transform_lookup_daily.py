@@ -2,10 +2,10 @@ import json
 import os
 import subprocess
 
-import duckdb
 from airflow.sdk import dag, task
 from airflow.sdk.exceptions import AirflowSkipException
 from apple_itunes.storage import ItunesBronzeToken, ItunesSilverToken
+from azure.storage.filedatalake import DataLakeServiceClient
 from common.storage.containers import ADLS_BRONZE_CONTAINER, ADLS_SILVER_CONTAINER
 
 from dags.bronze.apple_itunes.apple_lookup_daily import BRONZE_APPSTORE_ITUNES
@@ -28,32 +28,24 @@ def silver_transform_itunes_lookup_daily():
         bronze = ItunesBronzeToken()
         silver = ItunesSilverToken()
 
-        with duckdb.connect() as con:
-            bronze.init_connection(con)
-            bronze_dates = [
-                str(row[0])
-                for row in con.execute(
-                    f"SELECT DISTINCT snapshot_date "
-                    f"FROM read_json_auto("
-                    f"'azure://{ADLS_BRONZE_CONTAINER}/appstore_itunes/**/*.json'"
-                    f") ORDER BY snapshot_date;"
-                ).fetchall()
-            ]
+        def _snapshot_dates(client: DataLakeServiceClient, container: str) -> set[str]:
+            fs = client.get_file_system_client(container)
+            return {
+                p.name.split("snapshot_date=")[-1]
+                for p in fs.get_paths("appstore_itunes", recursive=False)
+                if p.is_directory and "snapshot_date=" in p.name
+            }
 
-        missing: list[str] = []
-        with duckdb.connect() as con:
-            silver.init_connection(con)
-            for snap in bronze_dates:
-                try:
-                    cnt = con.execute(
-                        f"SELECT COUNT(*) FROM read_parquet("
-                        f"'azure://{ADLS_SILVER_CONTAINER}/appstore_itunes/"
-                        f"snapshot_date={snap}/**/*.parquet');"
-                    ).fetchone()
-                    if not cnt or cnt[0] == 0:
-                        missing.append(snap)
-                except duckdb.IOException:
-                    missing.append(snap)
+        bronze_dates = _snapshot_dates(
+            DataLakeServiceClient(account_url=bronze.account_url, credential=bronze.sas_token),
+            ADLS_BRONZE_CONTAINER,
+        )
+        silver_dates = _snapshot_dates(
+            DataLakeServiceClient(account_url=silver.account_url, credential=silver.sas_token),
+            ADLS_SILVER_CONTAINER,
+        )
+
+        missing = sorted(bronze_dates - silver_dates)
 
         if not missing:
             raise AirflowSkipException("All bronze snapshots already processed into silver")
