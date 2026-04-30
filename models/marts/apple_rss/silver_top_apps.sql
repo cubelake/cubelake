@@ -13,7 +13,7 @@ SELECT
         WHEN _feed_type LIKE '%paid%' THEN 'paid'
         WHEN _feed_type LIKE '%free%' THEN 'free'
     END                                                           AS feed_type,
-    strptime(updated, '%a, %d %b %Y %H:%M:%S %z')                AS snapshot_updated,
+    try_strptime(updated, '%a, %d %b %Y %H:%M:%S %z')             AS snapshot_updated,
     CURRENT_TIMESTAMP                                             AS _loaded_at,
     NULLIF(trim(r.id), '')                                        AS app_id,
     NULLIF(trim(r.name), '')                                      AS app_name,
