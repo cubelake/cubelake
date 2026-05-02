@@ -8,7 +8,7 @@
 
 SELECT
     snapshot_date,
-    UPPER(NULLIF(TRIM(country), ''))                            AS country,
+    CAST(UPPER(NULLIF(TRIM(country), '')) AS VARCHAR)           AS country,
     CASE
         WHEN _feed_type LIKE '%paid%' THEN 'paid'
         WHEN _feed_type LIKE '%free%' THEN 'free'
