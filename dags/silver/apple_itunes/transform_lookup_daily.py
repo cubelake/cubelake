@@ -2,7 +2,7 @@ import json
 import os
 import subprocess
 
-from airflow.sdk import dag, task
+from airflow.sdk import Asset, dag, task
 from airflow.sdk.exceptions import AirflowSkipException
 from apple_itunes.storage import ItunesBronzeToken, ItunesSilverToken
 from azure.storage.filedatalake import DataLakeServiceClient
@@ -12,6 +12,8 @@ from dags.bronze.apple_itunes.apple_lookup_daily import BRONZE_APPSTORE_ITUNES
 from dags.utils.default_args import silver_args
 
 DBT_PROJECT_DIR = os.environ.get("DBT_PROJECT_DIR", "/opt/airflow/dbt/appstore-transform")
+
+SILVER_APPSTORE_ITUNES = Asset("azure://silver/appstore_itunes")
 
 
 @dag(
@@ -82,8 +84,13 @@ def silver_transform_itunes_lookup_daily():
                 f"dbt run failed for {snapshot_date}:\n{result.stdout}\n{result.stderr}"
             )
 
+    @task(task_id="emit_silver_itunes_asset", outlets=[SILVER_APPSTORE_ITUNES])
+    def emit_silver_itunes_asset(results: list) -> None:
+        pass
+
     missing_dates = discover_bronze_snapshots()
-    run_dbt_transform.expand(snapshot_date=missing_dates)
+    dbt_done = run_dbt_transform.expand(snapshot_date=missing_dates)
+    emit_silver_itunes_asset(dbt_done)
 
 
 silver_transform_itunes_lookup_daily()
