@@ -93,6 +93,17 @@ class ItunesSilverToken(AzureToken):
         return values
 
 
+class AppstoreSilverToken(AzureToken):
+    @model_validator(mode="before")
+    @classmethod
+    def load_from_env(cls, values: dict) -> dict:
+        if not values.get("account_url"):
+            values["account_url"] = os.environ["ACCOUNT_URL"]
+        if not values.get("sas_token"):
+            values["sas_token"] = os.environ["SILVER_APPSTORE_SAS_TOKEN"]
+        return values
+
+
 class AdlsEnv(BaseModel):
     account_url: str
     bronze_sas_token: str
