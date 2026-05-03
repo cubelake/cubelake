@@ -25,29 +25,17 @@ on-run-start:
       CONNECTION_STRING 'AccountName={{ env_var("ACCOUNT_NAME") }};SharedAccessSignature={{ env_var("SILVER_SAS_TOKEN") }}'
     );
   - >
-    {% if env_var("SILVER_RSS_SAS_TOKEN", "") != "" %}
     CREATE OR REPLACE SECRET silver_rss_secret (
       TYPE AZURE,
       SCOPE 'azure://silver/appstore_rss',
       CONNECTION_STRING 'AccountName={{ env_var("ACCOUNT_NAME") }};SharedAccessSignature={{ env_var("SILVER_RSS_SAS_TOKEN") }}'
     );
-    {% else %}SELECT 1;{% endif %}
   - >
-    {% if env_var("SILVER_ITUNES_SAS_TOKEN", "") != "" %}
     CREATE OR REPLACE SECRET silver_itunes_secret (
       TYPE AZURE,
       SCOPE 'azure://silver/appstore_itunes',
       CONNECTION_STRING 'AccountName={{ env_var("ACCOUNT_NAME") }};SharedAccessSignature={{ env_var("SILVER_ITUNES_SAS_TOKEN") }}'
     );
-    {% else %}SELECT 1;{% endif %}
-  - >
-    {% if env_var("GOLD_SAS_TOKEN", "") != "" %}
-    CREATE OR REPLACE SECRET gold_secret (
-      TYPE AZURE,
-      SCOPE 'azure://gold',
-      CONNECTION_STRING 'AccountName={{ env_var("ACCOUNT_NAME") }};SharedAccessSignature={{ env_var("GOLD_SAS_TOKEN") }}'
-    );
-    {% else %}SELECT 1;{% endif %}
 
 models:
   appstore_transform:
@@ -60,5 +48,3 @@ models:
     marts:
       materialized: table
       schema: marts
-    gold:
-      +tags: ['gold']
