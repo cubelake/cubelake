@@ -2,11 +2,12 @@ import json
 import os
 import subprocess
 
-import duckdb
 from airflow.sdk import Asset, dag, task
 from airflow.sdk.exceptions import AirflowSkipException
 from apple_rss.storage import RssBronzeToken, RssSilverToken
 from apple_rss.storage.containers import ADLS_BRONZE_CONTAINER, ADLS_SILVER_CONTAINER
+from azure.core.exceptions import ResourceNotFoundError
+from azure.storage.filedatalake import DataLakeServiceClient
 
 from dags.bronze.apple_rss.apple_top_daily import BRONZE_APPSTORE_RSS
 from dags.utils.default_args import silver_args
@@ -30,32 +31,27 @@ def silver_transform_top_daily():
         bronze = RssBronzeToken()
         silver = RssSilverToken()
 
-        with duckdb.connect() as con:
-            bronze.init_connection(con)
-            bronze_dates = [
-                str(row[0])
-                for row in con.execute(
-                    f"SELECT DISTINCT snapshot_date "
-                    f"FROM read_json_auto("
-                    f"'azure://{ADLS_BRONZE_CONTAINER}/appstore_rss/**/*.json'"
-                    f") ORDER BY snapshot_date;"
-                ).fetchall()
-            ]
+        def _snapshot_dates(client: DataLakeServiceClient, container: str) -> set[str]:
+            fs = client.get_file_system_client(container)
+            try:
+                return {
+                    p.name.split("snapshot_date=")[-1]
+                    for p in fs.get_paths("appstore_rss", recursive=False)
+                    if p.is_directory and "snapshot_date=" in p.name
+                }
+            except ResourceNotFoundError:
+                return set()
 
-        missing: list[str] = []
-        with duckdb.connect() as con:
-            silver.init_connection(con)
-            for snap in bronze_dates:
-                try:
-                    cnt = con.execute(
-                        f"SELECT COUNT(*) FROM read_parquet("
-                        f"'azure://{ADLS_SILVER_CONTAINER}/appstore_rss/"
-                        f"snapshot_date={snap}/**/*.parquet');"
-                    ).fetchone()
-                    if not cnt or cnt[0] == 0:
-                        missing.append(snap)
-                except duckdb.IOException:
-                    missing.append(snap)
+        bronze_dates = _snapshot_dates(
+            DataLakeServiceClient(account_url=bronze.account_url, credential=bronze.sas_token),
+            ADLS_BRONZE_CONTAINER,
+        )
+        silver_dates = _snapshot_dates(
+            DataLakeServiceClient(account_url=silver.account_url, credential=silver.sas_token),
+            ADLS_SILVER_CONTAINER,
+        )
+
+        missing = sorted(bronze_dates - silver_dates)
 
         if not missing:
             raise AirflowSkipException("All bronze snapshots already processed into silver")
