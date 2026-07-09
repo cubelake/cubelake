@@ -8,9 +8,18 @@ dependencies = []
 
 [tool.uv.workspace]
 members = [
+    "appstore-core",
     "ingestion-apple-rss",
     "ingestion-apple-itunes",
     "appstore-dags",
-    "appstore-core",
     "appstore-transform",
+]
+
+
+[tool.pytest.ini_options]
+addopts = "--import-mode=importlib"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
 ]
