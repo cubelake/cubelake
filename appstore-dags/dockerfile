@@ -36,7 +36,5 @@ RUN uv export --locked --no-dev --package appstore-dags -o /tmp/requirements.txt
         ./ingestion-apple-itunes \
     && rm -f /tmp/requirements.txt
 
-# Install dbt-duckdb for silver transformations
-RUN uv pip install --system "dbt-duckdb>=1.10.1"
 
 ENV PYTHONPATH="/app:${PYTHONPATH}"
