@@ -82,6 +82,8 @@ docker compose up airflow-init   # first time only
 docker compose up -d
 ```
 
+Or `just airflow-init && just airflow-up` from the `cubelake` root (see [`infra`](https://github.com/Cubelake/infra)'s `justfile`).
+
 ## Known limitations
 
 - No automated tests (`tests/` does not exist).
