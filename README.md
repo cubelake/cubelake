@@ -7,7 +7,7 @@
 ![dbt](https://img.shields.io/badge/dbt-1.10+-FF694B?logo=dbt&logoColor=white)
 ![DuckDB](https://img.shields.io/badge/DuckDB-1.2+-FFF000?logo=duckdb&logoColor=black)
 ![Azure](https://img.shields.io/badge/Azure_ADLS_Gen2-0078D4?logo=microsoftazure&logoColor=white)
-![License](https://img.shields.io/badge/License-Proprietary-red)
+![License](https://img.shields.io/badge/License-MIT-green)
 
 Cubelake implements a **medallion architecture** (bronze → silver → gold) with automated daily ingestion from the Apple RSS Feeds and iTunes API, orchestrated via Apache Airflow and transformed through dbt on top of DuckDB. All data lands in Azure Data Lake Storage Gen2.
 
@@ -26,8 +26,10 @@ Cubelake implements a **medallion architecture** (bronze → silver → gold) wi
   - [Airflow (Docker)](#airflow-docker)
   - [Airflow (standalone)](#airflow-standalone)
   - [dbt manually](#dbt-manually)
+  - [Testing](#testing)
 - [Project Internals](#project-internals)
 - [Repository Structure](#repository-structure)
+- [Known Limitations](#known-limitations)
 - [License](#license)
 
 ---
@@ -66,8 +68,8 @@ Apple RSS Feeds
                                  gold_dim_apps (SCD Type 1)
                                          │ GOLD_DIM_APPS
 
-[gold_transform_biweekly]  0 4 1,15 * *  →  fct_app_rank_history (incremental)
-[gold_transform_monthly]   0 5 1   * *   →  fct_app_rank_history (full refresh)
+[gold_transform_biweekly]  0 4 1,15 * *  →  fct_app_rank_history (full recompute)
+[gold_transform_monthly]   0 5 1   * *   →  fct_app_rank_history (full recompute)
 ```
 
 ### DAG Flow
@@ -82,13 +84,13 @@ Apple RSS Feeds
 | `gold_transform_daily` | asset | `SILVER_APPSTORE_APPS` | `GOLD_APPSTORE_DAILY` | `gold_fct_top_apps gold_fct_genre_stats` |
 | `gold_transform_dim_apps` | asset | `GOLD_APPSTORE_DAILY` | `GOLD_DIM_APPS` | `gold_dim_apps` |
 | `gold_transform_biweekly` | `0 4 1,15 * *` | — | `GOLD_FCT_RANK_HISTORY` | `gold_fct_app_rank_history` |
-| `gold_transform_monthly` | `0 5 1 * *` | — | — | `gold_fct_app_rank_history --full-refresh` |
+| `gold_transform_monthly` | `0 5 1 * *` | — | — | `gold_fct_app_rank_history` |
 
 > \* `silver_transform_appstore_apps_daily` is declared with `schedule=[SILVER_APPSTORE_RSS, SILVER_APPSTORE_ITUNES]`, so Airflow triggers it when either asset is updated. The `discover_missing_snapshots` task then computes the **intersection** of dates present in both silver RSS and silver iTunes, so a snapshot is only processed when both sources are ready.
 
 > `bronze_itunes_lookup_daily` triggers on `SILVER_APPSTORE_RSS`, not on the bronze RSS directly. It queries the silver RSS Parquet to discover which app IDs charted that day, then calls the iTunes lookup API for those IDs.
 
-> On the 1st of each month, both `gold_transform_biweekly` and `gold_transform_monthly` run. The biweekly is an incremental append; the monthly is a full recompute of the entire rank history table.
+> On the 1st of each month, both `gold_transform_biweekly` and `gold_transform_monthly` run. Despite the naming, `gold_fct_app_rank_history` is not a dbt-incremental model — every run (biweekly or monthly) does a full `snapshot_date=*` glob and recompute; the two schedules exist for operational cadence, not different dbt materialization strategies. See [`appstore-transform`](https://github.com/Cubelake/appstore-transform#known-limitations) for details.
 
 Bronze snapshots use Hive-style partitioning (`snapshot_date=YYYY-MM-DD/`). Silver DAGs use Airflow dynamic task expansion (`.expand()`, up to 4 concurrent tasks) to parallelize dbt runs per unprocessed snapshot.
 
@@ -118,12 +120,12 @@ The project is a monorepo of git submodules, each independently versioned:
 
 | Submodule | Description |
 |-----------|-------------|
-| **appstore-core** | Shared library — `BaseIngestor`, Azure storage abstractions, Pydantic data models |
-| **appstore-dags** | Airflow DAGs — orchestrates bronze ingestion, silver & gold transformations |
-| **ingestion-apple-rss** | Async ingestion service for Apple RSS top-apps feeds (GBR, USA, JPN, …) |
-| **ingestion-apple-itunes** | Async ingestion service for the iTunes lookup API (app metadata) |
-| **appstore-transform** | dbt project — SQL models for all three medallion layers |
-| **infra** | Infrastructure — Docker Compose, Dockerfiles, GitHub Actions CI/CD |
+| [**appstore-core**](https://github.com/Cubelake/appstore-core) | Shared library — `BaseIngestor`, Azure storage abstractions, Pydantic data models |
+| [**appstore-dags**](https://github.com/Cubelake/appstore-dags) | Airflow DAGs — orchestrates bronze ingestion, silver & gold transformations |
+| [**ingestion-apple-rss**](https://github.com/Cubelake/ingestion-apple-rss) | Async ingestion library for Apple RSS top-apps feeds (~175 countries × free/paid) |
+| [**ingestion-apple-itunes**](https://github.com/Cubelake/ingestion-apple-itunes) | Async ingestion library for the iTunes Lookup API (app metadata) |
+| [**appstore-transform**](https://github.com/Cubelake/appstore-transform) | dbt project — SQL models for all three medallion layers |
+| [**infra**](https://github.com/Cubelake/infra) | Infrastructure — Docker Compose, Dockerfiles, GitHub Actions CI/CD |
 
 ---
 
@@ -160,7 +162,10 @@ The project is a monorepo of git submodules, each independently versioned:
 ```bash
 git clone --recurse-submodules https://github.com/Cubelake/cubelake.git
 cd cubelake
-uv sync
+
+# installs every workspace member (appstore-core, ingestion-*, appstore-dags, appstore-transform) —
+# plain `uv sync` only installs the root project's own (empty) dependency set
+uv sync --all-packages
 ```
 
 If you already cloned without submodules:
@@ -171,7 +176,7 @@ git submodule update --init --recursive
 
 ### Environment Variables
 
-Create `.env` files from the templates inside `infra/<service>/`. Minimum required variables:
+Copy `infra/appstore-dags/.env.example` to `.env` (or `infra/appstore-dags/.env` for the Docker stack) and fill in real values. Minimum required variables:
 
 ```bash
 # Azure Storage account URL
@@ -186,6 +191,7 @@ BRONZE_ITUNES_SAS_TOKEN=<sas_token>
 SILVER_SAS_TOKEN=<sas_token>
 SILVER_RSS_SAS_TOKEN=<sas_token>
 SILVER_ITUNES_SAS_TOKEN=<sas_token>
+SILVER_APPSTORE_SAS_TOKEN=<sas_token>
 
 # Gold container token
 GOLD_SAS_TOKEN=<sas_token>
@@ -248,19 +254,29 @@ uv run --env-file .env dbt run --project-dir appstore-transform \
 uv run --env-file .env dbt test --project-dir appstore-transform
 ```
 
+### Testing
+
+```bash
+uv sync --all-packages
+uv run pytest ingestion-apple-rss/tests/ ingestion-apple-itunes/tests/ -v
+```
+
+Test coverage today is limited to URL/preset-key construction in the two ingestion libraries. `appstore-core` and `appstore-dags` have no automated tests yet, and `appstore-transform` has no dbt tests (`schema.yml` doesn't exist) — see each submodule's README for specifics.
+
 ---
 
 ## Project Internals
 
 ### BaseIngestor
 
-All ingestion services extend `appstore-core`'s `BaseIngestor`, which provides:
+Both ingestion libraries extend `appstore-core`'s `BaseIngestor`, which provides:
 
-- Async HTTP fetching via `httpx`
-- Configurable `batch_size`, `timeout`, and `max_retries`
-- JSON serialisation and ADLS write logic
+- Async, batched HTTP fetching via `httpx` with per-batch pacing and retries
+- `normalize(raw) -> list[dict]` as the one abstract method subclasses must implement
 
-Default config: `batch_size=10`, `timeout=15s`, `max_retries=2`.
+`BaseIngestor` only fetches and normalizes — it does not write to storage. Persisting results to ADLS (via `appstore-core`'s `BronzeRow`/storage-path models) is done by the calling Airflow task in `appstore-dags`.
+
+Default config (`IngestionConfig`, not currently overridable per-instance): `batch_size=10`, `batch_delay_seconds=4.0`, `timeout_seconds=15.0`, `max_retries=2`, `retry_delay_seconds=5.0`.
 
 ### Token Model Pattern
 
@@ -291,8 +307,8 @@ cubelake/
 ├── appstore-core/           # Shared library (submodule)
 ├── appstore-dags/           # Airflow DAGs (submodule)
 ├── appstore-transform/      # dbt project (submodule)
-├── ingestion-apple-rss/     # RSS ingestion service (submodule)
-├── ingestion-apple-itunes/  # iTunes ingestion service (submodule)
+├── ingestion-apple-rss/     # RSS ingestion library (submodule)
+├── ingestion-apple-itunes/  # iTunes ingestion library (submodule)
 ├── infra/                   # Docker, CI/CD (submodule)
 ├── pyproject.toml           # uv workspace root
 ├── uv.lock
@@ -301,6 +317,15 @@ cubelake/
 
 ---
 
+## Known Limitations
+
+This is an actively-evolving personal project, not a production system. Current gaps, tracked honestly rather than hidden:
+
+- **Test coverage** is limited to URL-construction unit tests in the two ingestion libraries; no tests exist yet for `appstore-core`, `appstore-dags`, or dbt models.
+- **dbt lineage is partial** — `silver_appstore_apps` and every gold model read via `read_parquet('azure://...')` globs instead of `{{ ref() }}`, so `dbt docs generate` won't show the full DAG past the RSS/iTunes silver layer. Execution order is enforced by the Airflow DAGs instead.
+- **`gold_fct_app_rank_history`** is documented as running "incrementally" but is a full recompute every run (`materialized='external'`, no dbt incremental logic) — the biweekly/monthly split is an orchestration decision, not a dbt materialization strategy.
+- **No CI beyond submodule-pointer sync** — each submodule's only GitHub Actions workflow bumps this repo's gitlink on push; there's no automated lint/test/build pipeline yet.
+
 ## License
 
-This project is proprietary. All rights reserved. See [LICENSE](LICENSE) for details.
+[MIT](LICENSE) — see [LICENSE](LICENSE) for the full text.
