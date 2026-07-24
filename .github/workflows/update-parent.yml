@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: update-parent
+  cancel-in-progress: false
+
 jobs:
   update-submodule:
     runs-on: ubuntu-latest
@@ -23,12 +27,34 @@ jobs:
           git checkout origin/main
           cd ..
 
-      - name: Commit and push
+      - name: Commit and push (retries on races with other submodule updates)
         run: |
           git config user.name "LASKAV"
           git config user.email "mksidoops@gmail.com"
-          git add ingestion-apple-itunes
-          # Only commit if there are changes
-          git diff --cached --quiet && echo "No changes" && exit 0
-          git commit -m "Update ingestion-apple-itunes submodule to $(cd ingestion-apple-itunes && git rev-parse --short HEAD)"
-          git push
+
+          target_sha=$(cd ingestion-apple-itunes && git rev-parse HEAD)
+
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+            git reset --hard origin/main
+            git -C ingestion-apple-itunes checkout "$target_sha"
+            git add ingestion-apple-itunes
+
+            if git diff --cached --quiet; then
+              echo "No changes — ingestion-apple-itunes is already up to date on main"
+              exit 0
+            fi
+
+            git commit -m "Update ingestion-apple-itunes submodule to ${target_sha:0:7}"
+
+            if git push origin main; then
+              echo "Pushed successfully"
+              exit 0
+            fi
+
+            echo "Push rejected (attempt $attempt/5) — likely a concurrent submodule update, retrying..."
+            sleep $(( attempt * 5 ))
+          done
+
+          echo "::error::Failed to push after 5 attempts"
+          exit 1
