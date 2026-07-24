@@ -10,8 +10,13 @@ dependencies = [
     "loguru>=0.7.3",
 ]
 
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [tool.setuptools.packages.find]
 where = ["."]
+include = ["ingestion_apple_itunes*"]
 
 [tool.uv.sources]
 appstore-core = { workspace = true }
