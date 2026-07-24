@@ -57,6 +57,8 @@ uv run --env-file .env dbt run --project-dir appstore-transform \
 uv run --env-file .env dbt run --project-dir appstore-transform --select marts/gold
 ```
 
+Or, from this directory, via the [`justfile`](justfile): `just dbt_ct`, `just run 2026-07-24`, `just run-gold 2026-07-24`, `just test`.
+
 `snapshot_date` has no project-level default — every model except `gold_dim_apps` and `gold_fct_app_rank_history` (which glob `snapshot_date=*` across all history) requires it to be passed explicitly.
 
 `profiles.yml` is gitignored (contains no secrets itself, but is environment-specific); create one at the project root:
