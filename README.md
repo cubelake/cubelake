@@ -16,11 +16,15 @@ Every Dockerfile and Compose file here is designed to be built from the **`cubel
 infra/
 ├── appstore-dags/
 │   ├── docker-compose.yml   # full Airflow stack
-│   └── dockerfile           # apache/airflow:3.2.0-python3.13 + workspace deps
+│   ├── dockerfile           # apache/airflow:3.2.0-python3.13 + workspace deps
+│   ├── justfile              # init/up/down/logs/cli recipes
+│   └── .env.example
 ├── ingestion-apple-itunes/
-│   └── dockerfile           # python:3.13-slim + workspace deps
+│   ├── dockerfile           # python:3.13-slim + workspace deps
+│   └── justfile              # build/run recipes
 └── ingestion-apple-rss/
-    └── dockerfile           # python:3.13-slim + workspace deps
+    ├── dockerfile           # python:3.13-slim + workspace deps
+    └── justfile              # build/run recipes
 ```
 
 ## Airflow stack (`appstore-dags/docker-compose.yml`)
@@ -31,6 +35,8 @@ docker compose up airflow-init   # first time only: DB migration + admin user
 docker compose up -d             # start everything
 docker compose --profile debug run airflow-cli airflow dags list  # optional CLI shell
 ```
+
+Or, via the [`justfile`](appstore-dags/justfile) in this directory: `just init`, `just up`, `just logs`, `just down`, `just nuke` (drops volumes), `just cli dags list`. The same recipes are also reachable from the monorepo root as `just airflow-init` / `just airflow-up` / etc. (see the root [`justfile`](../justfile)).
 
 | Service | Role |
 |---|---|
@@ -53,9 +59,11 @@ All three follow the same pattern: install [`uv`](https://github.com/astral-sh/u
 docker build -f infra/appstore-dags/dockerfile -t cubelake/appstore-dags .
 ```
 
+The two ingestion-service directories each have a [`justfile`](ingestion-apple-rss/justfile) with `build`/`run` recipes that set the correct context automatically, e.g. `cd infra/ingestion-apple-rss && just run python -c "import ingestion_apple_rss"`.
+
 ## Environment variables
 
-There's no `.env.example` yet — create `infra/appstore-dags/.env` with:
+Copy [`appstore-dags/.env.example`](appstore-dags/.env.example) to `appstore-dags/.env`:
 
 ```bash
 AIRFLOW_UID=50000                 # set to `id -u` on Linux hosts
@@ -79,7 +87,6 @@ This file is gitignored everywhere in this repo (`.env`, `.dockerignore`) — it
 
 ## Known limitations
 
-- No `.env.example` template.
 - No compose service or CI job actually runs the two ingestion-service images — they're built but not yet wired into an orchestrator here.
 - `AIRFLOW__CORE__FERNET_KEY` defaults to an empty string in the compose file — fine for local dev, must be set to a real key for anything shared.
 
