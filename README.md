@@ -155,6 +155,7 @@ The project is a monorepo of git submodules, each independently versioned:
 - Python 3.13+
 - [uv](https://github.com/astral-sh/uv) — `curl -LsSf https://astral.sh/uv/install.sh | sh`
 - Docker & Docker Compose (for the full Airflow stack)
+- [just](https://github.com/casey/just) — optional, but the root [`justfile`](justfile) wraps every command below
 - Azure Data Lake Storage Gen2 account with SAS tokens for bronze, silver, and gold containers
 
 ### Install
@@ -221,6 +222,8 @@ docker compose up -d
 docker compose logs -f
 ```
 
+Equivalent via the root [`justfile`](justfile): `just airflow-init`, `just airflow-up`, `just airflow-logs` (and `just airflow-down`).
+
 Airflow UI is available at **http://localhost:8080** (default credentials in `.env`).
 
 ### Airflow (standalone)
@@ -254,12 +257,16 @@ uv run --env-file .env dbt run --project-dir appstore-transform \
 uv run --env-file .env dbt test --project-dir appstore-transform
 ```
 
+Equivalent via the root justfile: `just dbt-debug`, `just dbt-run 2025-01-01`, `just dbt-run-gold 2025-01-01`, `just dbt-test`.
+
 ### Testing
 
 ```bash
 uv sync --all-packages
 uv run pytest ingestion-apple-rss/tests/ ingestion-apple-itunes/tests/ -v
 ```
+
+Or: `just setup && just test`.
 
 Test coverage today is limited to URL/preset-key construction in the two ingestion libraries. `appstore-core` and `appstore-dags` have no automated tests yet, and `appstore-transform` has no dbt tests (`schema.yml` doesn't exist) — see each submodule's README for specifics.
 
@@ -310,6 +317,7 @@ cubelake/
 ├── ingestion-apple-rss/     # RSS ingestion library (submodule)
 ├── ingestion-apple-itunes/  # iTunes ingestion library (submodule)
 ├── infra/                   # Docker, CI/CD (submodule)
+├── justfile                 # `just <recipe>` — wraps setup/test/Airflow/dbt commands
 ├── pyproject.toml           # uv workspace root
 ├── uv.lock
 └── .gitmodules
