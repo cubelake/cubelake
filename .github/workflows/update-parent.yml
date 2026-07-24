@@ -1,0 +1,60 @@
+name: Update parent repo (cubelake)
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: update-parent
+  cancel-in-progress: false
+
+jobs:
+  update-submodule:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout parent repo
+        uses: actions/checkout@v4
+        with:
+          repository: Cubelake/cubelake
+          token: ${{ secrets.PARENT_REPO_TOKEN }}
+          submodules: true
+          fetch-depth: 0
+
+      - name: Update appstore-transform submodule to latest
+        run: |
+          cd appstore-transform
+          git fetch origin main
+          git checkout origin/main
+          cd ..
+
+      - name: Commit and push (retries on races with other submodule updates)
+        run: |
+          git config user.name "LASKAV"
+          git config user.email "mksidoops@gmail.com"
+
+          target_sha=$(cd appstore-transform && git rev-parse HEAD)
+
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+            git reset --hard origin/main
+            git -C appstore-transform checkout "$target_sha"
+            git add appstore-transform
+
+            if git diff --cached --quiet; then
+              echo "No changes — appstore-transform is already up to date on main"
+              exit 0
+            fi
+
+            git commit -m "Update appstore-transform submodule to ${target_sha:0:7}"
+
+            if git push origin main; then
+              echo "Pushed successfully"
+              exit 0
+            fi
+
+            echo "Push rejected (attempt $attempt/5) — likely a concurrent submodule update, retrying..."
+            sleep $(( attempt * 5 ))
+          done
+
+          echo "::error::Failed to push after 5 attempts"
+          exit 1
