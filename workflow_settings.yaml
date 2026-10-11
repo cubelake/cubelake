@@ -1,4 +1,4 @@
-# Dataform project: raw (bronze, BigLake external tables) → normalized (silver, Iceberg managed tables).
+# Dataform project (must sit at the repo root for managed Dataform): raw (bronze, BigLake external tables) → normalized (silver, Iceberg managed tables).
 # defaultProject / vars are overridden per environment by the release configuration (Terraform).
 defaultProject: cubelake-dev
 defaultLocation: europe-central2

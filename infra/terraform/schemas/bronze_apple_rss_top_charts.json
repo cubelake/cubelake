@@ -1,0 +1,23 @@
+[
+  {"name": "_source", "type": "STRING"},
+  {"name": "_ingested_at", "type": "STRING"},
+  {"name": "_feed_type", "type": "STRING"},
+  {"name": "country", "type": "STRING"},
+  {"name": "title", "type": "STRING"},
+  {"name": "id", "type": "STRING"},
+  {"name": "updated", "type": "STRING"},
+  {"name": "results", "type": "RECORD", "mode": "REPEATED", "fields": [
+    {"name": "id", "type": "STRING"},
+    {"name": "name", "type": "STRING"},
+    {"name": "artistName", "type": "STRING"},
+    {"name": "releaseDate", "type": "STRING"},
+    {"name": "kind", "type": "STRING"},
+    {"name": "artworkUrl100", "type": "STRING"},
+    {"name": "url", "type": "STRING"},
+    {"name": "genres", "type": "RECORD", "mode": "REPEATED", "fields": [
+      {"name": "genreId", "type": "STRING"},
+      {"name": "name", "type": "STRING"},
+      {"name": "url", "type": "STRING"}
+    ]}
+  ]}
+]

@@ -1,75 +1,104 @@
 # Cubelake
 
-> Data engineering platform for collecting, processing, and analyzing Apple App Store data.
+> Apple App Store data on Google Cloud Lakehouse: raw API responses → normalized tables.
 
 ![Python](https://img.shields.io/badge/Python-3.13+-3776AB?logo=python&logoColor=white)
-![Airflow](https://img.shields.io/badge/Apache_Airflow-3.3-017CEE?logo=apacheairflow&logoColor=white)
-![dbt](https://img.shields.io/badge/dbt-1.10+-FF694B?logo=dbt&logoColor=white)
-![DuckDB](https://img.shields.io/badge/DuckDB-1.2+-FFF000?logo=duckdb&logoColor=black)
+![BigQuery](https://img.shields.io/badge/BigQuery-Iceberg-669DF6?logo=googlebigquery&logoColor=white)
+![Dataform](https://img.shields.io/badge/Dataform-3.0-4285F4?logo=googlecloud&logoColor=white)
+![Terraform](https://img.shields.io/badge/Terraform-1.9+-844FBA?logo=terraform&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-Cubelake is a **medallion lake** (bronze → silver → gold) built from **independent ELT services**,
-one per data source, each in its own repository. A service owns everything about its source —
-HTTP collection, storage paths, bronze format, dbt models, Airflow DAG, Dockerfile, tests and
-dependencies. Services share no code; they talk only through datasets in the lake, and those
-datasets are defined by versioned **data contracts**.
+Cubelake follows the [Google Cloud Lakehouse](https://docs.cloud.google.com/lakehouse/docs/lakehouse-basics)
+medallion pattern. Current scope is two layers:
 
-This repository is only the **project overview**. All code lives in the repos below.
+| Layer | Where | What |
+| --- | --- | --- |
+| **bronze** (raw) | Cloud Storage, NDJSON, `snapshot_date=YYYY-MM-DD/` | API responses exactly as received; exposed to BigQuery as BigLake external tables |
+| **silver** (normalized) | Apache Iceberg managed tables in BigQuery (data in our bucket) | one clean, typed row per entity per day, with data-quality assertions |
 
-## Repositories
+Gold (joined, business-level marts) comes later.
 
-| Repo | Role |
-| --- | --- |
-| [`apple-rss`](https://github.com/Cubelake/apple-rss) | Apple RSS top charts → bronze → `silver_top_apps` |
-| [`apple-itunes`](https://github.com/Cubelake/apple-itunes) | iTunes lookup for charted apps → bronze → `silver_itunes_app_details` |
-| [`appstore-analytics`](https://github.com/Cubelake/appstore-analytics) | joins both silvers → `silver_appstore_apps` → gold marts |
-| [`cubelake-contracts`](https://github.com/Cubelake/cubelake-contracts) | ODCS data contracts for every published dataset + parquet checker |
-| [`cubelake-platform`](https://github.com/Cubelake/cubelake-platform) | Airflow runtime (docker compose); later Terraform for GCP and deploys |
-
-## Data flow
+## Pipeline
 
 ```text
-apple-rss (@daily)
-  extract ─► bronze/appstore_rss/snapshot_date=D/*.json
-  transform (dbt) ─► silver/appstore_rss/…/top_apps.parquet          contract apple_rss.silver_top_apps
-                                                                       asset apple_rss_silver
-apple-itunes (on apple_rss_silver)
-  extract ─► bronze/appstore_itunes/snapshot_date=D/*.json
-  transform (dbt) ─► silver/appstore_itunes/…/app_details.parquet    contract apple_itunes.silver_itunes_app_details
-                                                                       asset apple_itunes_silver
-appstore-analytics (on both silvers)
-  silver ─► silver/appstore/…/apps.parquet
-  gold-daily ─► gold/fct_top_apps, gold/fct_genre_stats
-  dim-apps ─► gold/dim_apps                                            asset appstore_gold
-appstore_rank_history (1st & 15th) ─► gold/fct_app_rank_history
+Cloud Scheduler (daily 06:17 UTC) → Cloud Workflows "cubelake-daily"
+  1. Cloud Run job  cubelake-extract apple-rss    → gs://cbl-<env>-bronze-<rand>/apple_rss/top_charts/snapshot_date=D/
+  2. Dataform       tag apple_rss                 → silver_apple_rss.top_apps
+  3. Cloud Run job  cubelake-extract apple-itunes → gs://…/apple_itunes/lookup/snapshot_date=D/
+                    (app ids read from silver_apple_rss.top_apps)
+  4. Dataform       tag apple_itunes              → silver_apple_itunes.app_details
 ```
 
-Every step that works on dates first asks the service which days are **pending** (input exists,
-output doesn't), so missed days and backfills are picked up automatically.
+Re-process a day: run the workflow with `{"snapshot_date": "2026-10-11"}`. Silver tables are incremental
+(MERGE on their key), so re-runs are idempotent.
 
-## Getting started
+## Data
 
-Prerequisites: [uv](https://docs.astral.sh/uv/), [just](https://github.com/casey/just), Docker.
-Keep all repos side by side:
+| Dataset.table | Type | Grain |
+| --- | --- | --- |
+| `bronze_apple_rss.top_charts` | BigLake external (NDJSON) | one chart response per country × free/paid per day |
+| `bronze_apple_itunes.lookup` | BigLake external (NDJSON) | one lookup response per country × free/paid per day |
+| `silver_apple_rss.top_apps` | Iceberg managed | app × chart position × country × feed × day |
+| `silver_apple_itunes.app_details` | Iceberg managed | app × country × feed × day |
+
+Bronze tables require a `snapshot_date` filter. Silver tables are partitioned by `snapshot_date` and
+clustered by `country, feed_type`.
+
+## Repository layout
+
+Modular monolith — one repo, clear boundaries per source:
+
+```text
+extract/                 Python (uv) — Cloud Run job image `cubelake-extract <source> --date D`
+  src/cubelake_extract/
+    core/                http fetching, bronze record format, storage writes
+    apple_rss/           top charts: countries, feed URLs, extract
+    apple_itunes/        lookups for charted apps
+workflow_settings.yaml   Dataform project (must be at the repo root for managed Dataform)
+definitions/             Dataform: sources (bronze), apple_rss/, apple_itunes/ (silver)
+includes/                Dataform helpers
+workflows/               Cloud Workflows pipeline
+infra/terraform/         all GCP resources
+.github/workflows/ci.yml tests, import boundaries, dataform compile, terraform validate, gitleaks
+```
+
+`apple_rss` and `apple_itunes` never import each other (enforced by `import-linter`); both may use `core`.
+
+## Naming
+
+| Thing | Convention | Example |
+| --- | --- | --- |
+| Projects | `prj-<d\|p>-cubelake-<rand>` ([Google blueprint](https://docs.cloud.google.com/architecture/blueprints/security-foundations/summary)) | `prj-p-cubelake-a1b2` |
+| Buckets | `cbl-<d\|p>-<layer>-<rand>` — no project name, hard to guess ([GCS best practices](https://docs.cloud.google.com/storage/docs/best-practices)) | `cbl-p-bronze-7f3c` |
+| Raw paths | `<source>/<dataset>/snapshot_date=YYYY-MM-DD/<country>_<feed>.json` | `apple_rss/top_charts/snapshot_date=2026-10-11/us_top_free.json` |
+| Datasets | `<layer>_<source>` | `silver_apple_rss` |
+| Iceberg data | `gs://cbl-<env>-silver-<rand>/iceberg/<dataset>/<table>/` | |
+| Region | everything in one region (buckets and datasets must match) | `europe-central2` |
+
+## Local development
+
+Prerequisites: [uv](https://docs.astral.sh/uv/), [just](https://github.com/casey/just), Node 20+, Terraform 1.9+, Docker.
 
 ```bash
-mkdir cubelake-workspace && cd cubelake-workspace
-git clone https://github.com/Cubelake/cubelake-platform.git
-cd cubelake-platform
-just clone      # apple-rss, apple-itunes, appstore-analytics, cubelake-contracts next to it
-just test-all
-just init && just up   # Airflow on http://localhost:8080
+just test              # extract tests + module boundaries
+just dataform-compile  # compile the SQLX project offline
+just tf-validate       # terraform fmt + validate offline
+just check             # all of the above (what CI runs)
+just extract apple-rss 2026-10-11 /tmp/lake   # real API pull into a local folder
 ```
 
-Each service also runs on its own — see its README (`uv sync && uv run pytest`, `uv run <service> --help`).
+Running Dataform or the workflow needs a GCP project.
 
-## Known limitations
+## Deploying (first time)
 
-- **Cloud is not wired yet.** Every service supports `gs://` paths, but GCS, Terraform and CD come after the GCP project exists.
-- **Contracts are not enforced in the services yet** — that needs the contracts repo published so services can pin a tag.
-- **`gold_fct_app_rank_history`** is a full recompute every run.
-- **Images are large (~1.4 GB)** because of dbt + Google client libraries.
-- **No CI yet.**
+1. Create the GCP project (`prj-d-cubelake-<rand>`) with billing; `gcloud auth application-default login`.
+2. Create a GCS bucket for Terraform state and a Secret Manager secret `dataform-github-token`
+   (read-only GitHub token for this repo).
+3. `cd infra/terraform && cp terraform.tfvars.example terraform.tfvars` and fill it in.
+4. `terraform init -backend-config="bucket=<state-bucket>" && terraform apply`.
+5. Build and push the extract image to the `extract_image` output, then re-apply with `extract_image_tag`.
+
+CD from GitHub Actions (Workload Identity Federation, no keys) comes next.
 
 ## License
 

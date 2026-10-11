@@ -1,0 +1,67 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: extract
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.32"
+      - run: uv sync --locked
+      - run: uv run pytest -q
+      - run: uv run lint-imports
+      - run: docker build -t cubelake-extract:ci .
+
+  dataform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Compile (fails on SQLX / config errors)
+        run: |
+          npx -y @dataform/cli@3.0.71 compile --json \
+            --vars=snapshot_date=2026-01-01,silver_bucket=ci-bucket > compiled.json
+          node -e '
+            const raw = require("fs").readFileSync("compiled.json", "utf8");
+            const graph = JSON.parse(raw.slice(raw.indexOf("{")));
+            const errors = (graph.graphErrors || {}).compilationErrors || [];
+            if (errors.length) { console.error(JSON.stringify(errors, null, 2)); process.exit(1); }
+            console.log(`OK: ${graph.tables.length} tables, ${graph.assertions.length} assertions`);'
+
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.16.5"
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false -input=false
+      - run: terraform validate
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
