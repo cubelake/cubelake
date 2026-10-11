@@ -2,16 +2,16 @@ import asyncio
 
 from loguru import logger
 
-from cubelake_extract.apple_rss.config import Settings
-from cubelake_extract.apple_rss.feeds import all_feeds
-from cubelake_extract.core import bronze
-from cubelake_extract.core.http import fetch_json
-from cubelake_extract.core.storage import partition, write_text
+from cubelake_ingest.apple_rss.config import Settings
+from cubelake_ingest.apple_rss.feeds import all_feeds
+from cubelake_ingest.core import bronze
+from cubelake_ingest.core.http import fetch_json
+from cubelake_ingest.core.storage import partition, write_text
 
 SOURCE = "apple-rss"
 
 
-def extract(settings: Settings, snapshot_date: str) -> int:
+def ingest(settings: Settings, snapshot_date: str) -> int:
     """Fetch every top chart and write one raw NDJSON file per country/feed."""
     feeds = all_feeds()
     responses = asyncio.run(fetch_json(list(feeds.values())))

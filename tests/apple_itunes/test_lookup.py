@@ -1,6 +1,6 @@
 import pytest
 
-from cubelake_extract.apple_itunes.lookup import lookup_url, lookup_urls
+from cubelake_ingest.apple_itunes.lookup import lookup_url, lookup_urls
 
 ITUNES_BASE = "https://itunes.apple.com/lookup"
 

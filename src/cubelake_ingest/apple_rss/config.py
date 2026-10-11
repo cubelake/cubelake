@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """apple-rss extract configuration (env vars APPLE_RSS_*)."""
+    """apple-rss ingest configuration (env vars APPLE_RSS_*)."""
 
     model_config = SettingsConfigDict(env_prefix="APPLE_RSS_")
 

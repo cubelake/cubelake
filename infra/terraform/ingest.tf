@@ -15,14 +15,14 @@ resource "google_artifact_registry_repository" "images" {
   depends_on = [google_project_service.apis]
 }
 
-resource "google_service_account" "extract" {
-  account_id   = "sa-extract"
-  display_name = "cubelake extract (Cloud Run job)"
+resource "google_service_account" "ingest" {
+  account_id   = "sa-ingest"
+  display_name = "cubelake ingest (Cloud Run job)"
 }
 
 # One job, one image; the workflow passes `<source> --date D` as args per execution.
-resource "google_cloud_run_v2_job" "extract" {
-  name                = "cubelake-extract"
+resource "google_cloud_run_v2_job" "ingest" {
+  name                = "cubelake-ingest"
   location            = var.region
   deletion_protection = false
   labels              = local.labels
@@ -30,12 +30,12 @@ resource "google_cloud_run_v2_job" "extract" {
   template {
     task_count = 1
     template {
-      service_account = google_service_account.extract.email
+      service_account = google_service_account.ingest.email
       timeout         = "3600s"
       max_retries     = 1
 
       containers {
-        image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.images.repository_id}/cubelake-extract:${var.extract_image_tag}"
+        image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.images.repository_id}/cubelake-ingest:${var.ingest_image_tag}"
         args  = ["--help"]
 
         resources {
@@ -62,28 +62,28 @@ resource "google_cloud_run_v2_job" "extract" {
 }
 
 # Least privilege: write raw files (re-runs overwrite a day), read the apple-rss silver table.
-resource "google_storage_bucket_iam_member" "extract_bronze" {
+resource "google_storage_bucket_iam_member" "ingest_bronze" {
   bucket = google_storage_bucket.bronze.name
   role   = "roles/storage.objectUser"
-  member = google_service_account.extract.member
+  member = google_service_account.ingest.member
 }
 
-resource "google_bigquery_dataset_iam_member" "extract_reads_rss_silver" {
+resource "google_bigquery_dataset_iam_member" "ingest_reads_rss_silver" {
   dataset_id = google_bigquery_dataset.this["silver_apple_rss"].dataset_id
   role       = "roles/bigquery.dataViewer"
-  member     = google_service_account.extract.member
+  member     = google_service_account.ingest.member
 }
 
-resource "google_project_iam_member" "extract_jobs" {
+resource "google_project_iam_member" "ingest_jobs" {
   project = var.project_id
   role    = "roles/bigquery.jobUser"
-  member  = google_service_account.extract.member
+  member  = google_service_account.ingest.member
 }
 
 # The BigLake connection's service account reads Iceberg data files in silver too.
-resource "google_bigquery_connection_iam_member" "extract_uses_lake" {
+resource "google_bigquery_connection_iam_member" "ingest_uses_lake" {
   location      = var.region
   connection_id = google_bigquery_connection.lake.connection_id
   role          = "roles/bigquery.connectionUser"
-  member        = google_service_account.extract.member
+  member        = google_service_account.ingest.member
 }

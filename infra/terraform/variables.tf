@@ -18,8 +18,8 @@ variable "region" {
   default     = "europe-central2"
 }
 
-variable "extract_image_tag" {
-  description = "Tag of the cubelake-extract image in Artifact Registry (git SHA, set by CD)."
+variable "ingest_image_tag" {
+  description = "Tag of the cubelake-ingest image in Artifact Registry (git SHA, set by CD)."
   type        = string
   default     = "latest"
 }

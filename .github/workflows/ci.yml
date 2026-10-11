@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  extract:
+  python:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,7 +19,7 @@ jobs:
       - run: uv sync --locked
       - run: uv run pytest -q
       - run: uv run lint-imports
-      - run: docker build -t cubelake-extract:ci .
+      - run: docker build -t cubelake-ingest:ci .
 
   dataform:
     runs-on: ubuntu-latest

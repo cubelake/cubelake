@@ -17,11 +17,11 @@ tf-validate:
 
 # Build the Cloud Run job image
 image:
-    docker build -t cubelake-extract:local .
+    docker build -t cubelake-ingest:local .
 
-# Run one extract locally into a folder, e.g. `just extract apple-rss 2026-10-11 /tmp/lake`
-extract source date root="/tmp/cubelake-lake":
-    APPLE_RSS_BRONZE_URI={{ root }}/apple_rss/top_charts APPLE_ITUNES_BRONZE_URI={{ root }}/apple_itunes/lookup uv run cubelake-extract {{ source }} --date {{ date }}
+# Run one ingest locally into a folder, e.g. `just ingest apple-rss 2026-10-11 /tmp/lake`
+ingest source date root="/tmp/cubelake-lake":
+    APPLE_RSS_BRONZE_URI={{ root }}/apple_rss/top_charts APPLE_ITUNES_BRONZE_URI={{ root }}/apple_itunes/lookup uv run cubelake-ingest {{ source }} --date {{ date }}
 
 # Everything CI checks
 check: test dataform-compile tf-validate

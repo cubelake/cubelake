@@ -1,6 +1,6 @@
 import pytest
 
-from cubelake_extract.apple_rss.feeds import FeedType, all_feeds, countries, feed_url, preset_key
+from cubelake_ingest.apple_rss.feeds import FeedType, all_feeds, countries, feed_url, preset_key
 
 RSS_BASE = "https://rss.marketingtools.apple.com/api/v2"
 

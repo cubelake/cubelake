@@ -22,9 +22,9 @@ Gold (joined, business-level marts) comes later.
 
 ```text
 Cloud Scheduler (daily 06:17 UTC) → Cloud Workflows "cubelake-daily"
-  1. Cloud Run job  cubelake-extract apple-rss    → gs://cbl-<env>-bronze-<rand>/apple_rss/top_charts/snapshot_date=D/
+  1. Cloud Run job  cubelake-ingest apple-rss    → gs://cbl-<env>-bronze-<rand>/apple_rss/top_charts/snapshot_date=D/
   2. Dataform       tag apple_rss                 → silver_apple_rss.top_apps
-  3. Cloud Run job  cubelake-extract apple-itunes → gs://…/apple_itunes/lookup/snapshot_date=D/
+  3. Cloud Run job  cubelake-ingest apple-itunes → gs://…/apple_itunes/lookup/snapshot_date=D/
                     (app ids read from silver_apple_rss.top_apps)
   4. Dataform       tag apple_itunes              → silver_apple_itunes.app_details
 ```
@@ -46,17 +46,19 @@ clustered by `country, feed_type`.
 
 ## Repository layout
 
-Modular monolith — one repo, clear boundaries per source:
+Modular monolith — one repo, clear boundaries per source. ELT: **E+L** = ingestion (Python, Cloud Run job →
+bronze), **T** = Dataform (bronze → silver).
 
 ```text
-pyproject.toml, uv.lock  Python (uv) project; Dockerfile → Cloud Run job image `cubelake-extract <source> --date D`
-src/cubelake_extract/
+pyproject.toml, uv.lock  Python (uv) project; Dockerfile → Cloud Run job image `cubelake-ingest <source> --date D`
+src/cubelake_ingest/
   core/                  http fetching, bronze record format, storage writes
-  apple_rss/             top charts: countries, feed URLs, extract
+  apple_rss/             top charts: countries, feed URLs, ingest
   apple_itunes/          lookups for charted apps
 tests/                   pytest
 workflow_settings.yaml   Dataform project (must be at the repo root for managed Dataform)
-definitions/             Dataform: sources (bronze), apple_rss/, apple_itunes/ (silver)
+definitions/sources/<source>/   Dataform (Google layout): bronze declaration `<source>.js` + silver models `<source>_<table>.sqlx`
+                         (`intermediate/` for joins and `outputs/<entity>/` for gold come later)
 includes/                Dataform helpers
 workflows/               Cloud Workflows pipeline
 infra/terraform/         all GCP resources
@@ -81,11 +83,11 @@ infra/terraform/         all GCP resources
 Prerequisites: [uv](https://docs.astral.sh/uv/), [just](https://github.com/casey/just), Node 20+, Terraform 1.9+, Docker.
 
 ```bash
-just test              # extract tests + module boundaries
+just test              # ingest tests + module boundaries
 just dataform-compile  # compile the SQLX project offline
 just tf-validate       # terraform fmt + validate offline
 just check             # all of the above (what CI runs)
-just extract apple-rss 2026-10-11 /tmp/lake   # real API pull into a local folder
+just ingest apple-rss 2026-10-11 /tmp/lake   # real API pull into a local folder
 ```
 
 Running Dataform or the workflow needs a GCP project.
@@ -97,7 +99,7 @@ Running Dataform or the workflow needs a GCP project.
    (read-only GitHub token for this repo).
 3. `cd infra/terraform && cp terraform.tfvars.example terraform.tfvars` and fill it in.
 4. `terraform init -backend-config="bucket=<state-bucket>" && terraform apply`.
-5. Build and push the extract image to the `extract_image` output, then re-apply with `extract_image_tag`.
+5. Build and push the ingest image to the `ingest_image` output, then re-apply with `ingest_image_tag`.
 
 CD from GitHub Actions (Workload Identity Federation, no keys) comes next.
 

@@ -11,7 +11,7 @@ class FeedType(StrEnum):
 
 
 def countries() -> tuple[str, ...]:
-    return tuple(json.loads(files("cubelake_extract.apple_rss").joinpath("countries.json").read_text("utf-8")))
+    return tuple(json.loads(files("cubelake_ingest.apple_rss").joinpath("countries.json").read_text("utf-8")))
 
 
 def preset_key(country: str, feed: FeedType) -> str:

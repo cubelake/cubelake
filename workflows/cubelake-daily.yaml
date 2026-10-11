@@ -1,4 +1,4 @@
-# Daily pipeline: raw → silver per source. Triggered by Cloud Scheduler; run by hand with
+# Daily pipeline: bronze (ingest) → silver (Dataform) per source. Triggered by Cloud Scheduler; run by hand with
 # {"snapshot_date": "YYYY-MM-DD"} to re-process a day. Env vars are set by Terraform.
 main:
   params: [args]
@@ -7,7 +7,7 @@ main:
         assign:
           - project: ${sys.get_env("GOOGLE_CLOUD_PROJECT_ID")}
           - region: ${sys.get_env("REGION")}
-          - extract_job: ${sys.get_env("EXTRACT_JOB")}
+          - ingest_job: ${sys.get_env("INGEST_JOB")}
           - dataform_repo: ${sys.get_env("DATAFORM_REPOSITORY")}
           - silver_bucket: ${sys.get_env("SILVER_BUCKET")}
           - snapshot_date: ${text.substring(time.format(sys.now()), 0, 10)}
@@ -16,12 +16,12 @@ main:
           - condition: ${args != null and "snapshot_date" in args}
             assign:
               - snapshot_date: ${args.snapshot_date}
-    - apple_rss_raw:
-        call: extract
+    - apple_rss_bronze:
+        call: ingest
         args:
           project: "${project}"
           region: "${region}"
-          job: "${extract_job}"
+          job: "${ingest_job}"
           source: "apple-rss"
           snapshot_date: "${snapshot_date}"
     - apple_rss_silver:
@@ -32,12 +32,12 @@ main:
           tag: "apple_rss"
           snapshot_date: "${snapshot_date}"
           silver_bucket: "${silver_bucket}"
-    - apple_itunes_raw:
-        call: extract
+    - apple_itunes_bronze:
+        call: ingest
         args:
           project: "${project}"
           region: "${region}"
-          job: "${extract_job}"
+          job: "${ingest_job}"
           source: "apple-itunes"
           snapshot_date: "${snapshot_date}"
     - apple_itunes_silver:
@@ -51,8 +51,8 @@ main:
     - done:
         return: ${"cubelake-daily finished for " + snapshot_date}
 
-# Runs the extract Cloud Run job for one source and waits for it to finish.
-extract:
+# Runs the ingest Cloud Run job for one source and waits for it to finish.
+ingest:
   params: [project, region, job, source, snapshot_date]
   steps:
     - run:

@@ -1,5 +1,5 @@
 [project]
-name = "cubelake-extract"
+name = "cubelake-ingest"
 version = "0.1.0"
 description = "Pulls Apple App Store APIs into the cubelake raw (bronze) zone; runs as Cloud Run jobs"
 requires-python = ">=3.13"
@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [project.scripts]
-cubelake-extract = "cubelake_extract.cli:main"
+cubelake-ingest = "cubelake_ingest.cli:main"
 
 [dependency-groups]
 dev = [
@@ -32,18 +32,18 @@ addopts = "--import-mode=importlib"
 
 # Module boundaries: each source is self-contained; both may use core, core uses neither.
 [tool.importlinter]
-root_package = "cubelake_extract"
+root_package = "cubelake_ingest"
 
 [[tool.importlinter.contracts]]
 name = "Sources are independent"
 type = "independence"
-modules = ["cubelake_extract.apple_rss", "cubelake_extract.apple_itunes"]
+modules = ["cubelake_ingest.apple_rss", "cubelake_ingest.apple_itunes"]
 
 [[tool.importlinter.contracts]]
 name = "Core does not depend on sources"
 type = "forbidden"
-source_modules = ["cubelake_extract.core"]
-forbidden_modules = ["cubelake_extract.apple_rss", "cubelake_extract.apple_itunes"]
+source_modules = ["cubelake_ingest.core"]
+forbidden_modules = ["cubelake_ingest.apple_rss", "cubelake_ingest.apple_itunes"]
 
 [build-system]
 requires = ["hatchling"]

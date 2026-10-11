@@ -1,4 +1,4 @@
 project_id = "prj-d-cubelake-a1b2"
 env        = "d"
 # region          = "europe-central2"
-# extract_image_tag = "<git sha>"
+# ingest_image_tag = "<git sha>"

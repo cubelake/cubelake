@@ -1,7 +1,7 @@
 import json
 
-from cubelake_extract.core import bronze
-from cubelake_extract.core.storage import partition, write_text
+from cubelake_ingest.core import bronze
+from cubelake_ingest.core.storage import partition, write_text
 
 
 def test_bronze_record_keeps_stable_format():

@@ -6,7 +6,7 @@ resource "google_service_account" "workflows" {
 resource "google_workflows_workflow" "daily" {
   name            = "cubelake-daily"
   region          = var.region
-  description     = "raw → silver for every source: extract job, then Dataform per source tag."
+  description     = "raw → silver for every source: ingest job, then Dataform per source tag."
   service_account = google_service_account.workflows.email
   source_contents = file("${path.module}/../../workflows/cubelake-daily.yaml")
   labels          = local.labels
@@ -14,7 +14,7 @@ resource "google_workflows_workflow" "daily" {
 
   user_env_vars = {
     REGION              = var.region
-    EXTRACT_JOB         = google_cloud_run_v2_job.extract.name
+    INGEST_JOB          = google_cloud_run_v2_job.ingest.name
     DATAFORM_REPOSITORY = google_dataform_repository.cubelake.id
     SILVER_BUCKET       = google_storage_bucket.silver.name
   }
@@ -22,16 +22,16 @@ resource "google_workflows_workflow" "daily" {
   depends_on = [google_project_service.apis]
 }
 
-# Run the extract job with per-execution args (runWithOverrides is in run.developer), scoped to the job.
-resource "google_cloud_run_v2_job_iam_member" "workflows_runs_extract" {
-  name     = google_cloud_run_v2_job.extract.name
+# Run the ingest job with per-execution args (runWithOverrides is in run.developer), scoped to the job.
+resource "google_cloud_run_v2_job_iam_member" "workflows_runs_ingest" {
+  name     = google_cloud_run_v2_job.ingest.name
   location = var.region
   role     = "roles/run.developer"
   member   = google_service_account.workflows.member
 }
 
-resource "google_service_account_iam_member" "workflows_actas_extract" {
-  service_account_id = google_service_account.extract.name
+resource "google_service_account_iam_member" "workflows_actas_ingest" {
+  service_account_id = google_service_account.ingest.name
   role               = "roles/iam.serviceAccountUser"
   member             = google_service_account.workflows.member
 }

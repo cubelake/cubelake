@@ -4,11 +4,11 @@ from collections.abc import Iterable
 from google.cloud import bigquery
 from loguru import logger
 
-from cubelake_extract.apple_itunes.config import Settings
-from cubelake_extract.apple_itunes.lookup import lookup_urls
-from cubelake_extract.core import bronze
-from cubelake_extract.core.http import fetch_json
-from cubelake_extract.core.storage import partition, write_text
+from cubelake_ingest.apple_itunes.config import Settings
+from cubelake_ingest.apple_itunes.lookup import lookup_urls
+from cubelake_ingest.core import bronze
+from cubelake_ingest.core.http import fetch_json
+from cubelake_ingest.core.storage import partition, write_text
 
 SOURCE = "apple-itunes"
 
@@ -34,7 +34,7 @@ def group_app_ids(rows: Iterable[tuple[str, str, int]]) -> dict[str, list[str]]:
     return ids
 
 
-def extract(settings: Settings, snapshot_date: str, rows: Iterable[tuple[str, str, int]] | None = None) -> int:
+def ingest(settings: Settings, snapshot_date: str, rows: Iterable[tuple[str, str, int]] | None = None) -> int:
     app_ids = group_app_ids(rows if rows is not None else charted_rows(settings, snapshot_date))
     if not app_ids:
         raise RuntimeError(f"No charted apps in {settings.top_apps_table} for {snapshot_date}")

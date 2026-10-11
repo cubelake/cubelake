@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """apple-itunes extract configuration (env vars APPLE_ITUNES_*)."""
+    """apple-itunes ingest configuration (env vars APPLE_ITUNES_*)."""
 
     model_config = SettingsConfigDict(env_prefix="APPLE_ITUNES_")
 
