@@ -168,6 +168,9 @@ ORDER BY t.app_rank LIMIT 10;
 
 ## Старые данные (Azure)
 
-Bronze, собранный до перехода на GCP, лежит в Azure Blob. Его нужно перенести в bronze-бакет через Storage
-Transfer Service с **переложением путей** под раскладку выше. Это ещё не сделано, шаги — в
-[owner-tasks.md](owner-tasks.md).
+Bronze, собранный до перехода на GCP, лежит в Azure ADLS Gen2 по путям
+`bronze/appstore_rss/snapshot_date=D/<country>_<feed>.json` и `bronze/appstore_itunes/…`. Формат записи тот
+же, отличается только `_source` (`ingestion-apple-rss`). Перенос делает
+[`scripts/migrate_azure_bronze.sh`](../scripts/migrate_azure_bronze.sh) (Storage Transfer Service, пути
+`appstore_rss/` → `apple_rss/top_charts/`, `appstore_itunes/` → `apple_itunes/lookup/`), затем silver
+пересобирается запуском `{"rebuild_silver": true}`. Пошагово — в [owner-tasks.md](owner-tasks.md).

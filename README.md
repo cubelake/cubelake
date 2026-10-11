@@ -61,6 +61,7 @@ definitions/sources/<source>/   Dataform (Google layout): bronze declaration `<s
                          (`intermediate/` for joins and `outputs/<entity>/` for gold come later)
 includes/                Dataform helpers
 workflows/               Cloud Workflows pipeline
+scripts/                 one-off ops scripts (Azure bronze → GCS migration)
 infra/terraform/         all GCP resources
 .github/workflows/ci.yml tests, import boundaries, dataform compile, terraform validate, gitleaks
 ```
@@ -97,6 +98,7 @@ Running Dataform or the workflow needs a GCP project.
 | Doc | What |
 | --- | --- |
 | [docs/architecture.md](docs/architecture.md) | ELT layers, components, security, CI, what is verified |
+| [docs/data-flow.md](docs/data-flow.md) | diagrams: what runs when, by which identity, reading/writing what; deploy and Azure migration flow |
 | [docs/data.md](docs/data.md) | where every piece of data lives, file/record formats, table columns, naming |
 | [docs/operations.md](docs/operations.md) | local dev, deploys, manual and backfill runs, troubleshooting, adding a source |
 | [docs/owner-tasks.md](docs/owner-tasks.md) | step-by-step checklist for the owner: GCP setup, first deploy, Azure migration |

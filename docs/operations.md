@@ -61,12 +61,19 @@ gcloud run jobs execute cubelake-ingest --region europe-central2 --args=apple-rs
 
 Перезапуск безопасен: bronze перезаписывает файлы своего дня, а silver делает MERGE по ключу.
 
-**Загрузка истории за много дней.** Запускайте workflow с `snapshot_date` по одному дню, в цикле. Apple не
-отдаёт прошлые чарты, поэтому за прошлые дни сработает только Dataform по уже лежащему bronze, например
-после переноса из Azure. Для этого есть два варианта:
-- в консоли Dataform выполнить тег с `vars.snapshot_date` нужного дня;
-- оставить `snapshot_date` пустым: тогда Dataform перечитает все дни сразу. Включите
-  «full refresh», если меняли схему.
+**Важно:** Apple отдаёт только текущие чарты. Если запустить ingest за прошлую дату, под этой датой
+запишется сегодняшний чарт. Запуск с `snapshot_date` имеет смысл только для перезапуска сегодняшнего или
+вчерашнего дня.
+
+**Пересобрать silver за все дни** (после переноса из Azure или после изменения SQL):
+
+```bash
+gcloud workflows run cubelake-daily --location europe-central2 --data='{"rebuild_silver": true}'
+```
+
+Ingest при этом не запускается. Dataform компилируется с пустым `snapshot_date`, читает весь bronze и
+делает MERGE в silver. Если меняли схему silver-таблицы (колонки, ключ), сначала удалите таблицу или
+запустите тег с «full refresh» в консоли Dataform.
 
 ## Где смотреть, что случилось
 

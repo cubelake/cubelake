@@ -125,16 +125,32 @@
 
 ## 7. Перенос старого bronze из Azure
 
-Мне нужны от вас три вещи. **Не присылайте ключи в чат** — я дам команду, которая положит их в
-Secret Manager.
-- [ ] Имя storage account и container в Azure.
-- [ ] Как там сейчас разложены файлы (пример 2–3 путей).
-- [ ] SAS-токен на этот container с правами **Read + List** и сроком на неделю
-  (Azure Portal → container → Shared access tokens).
+Делается скриптом [`scripts/migrate_azure_bronze.sh`](../scripts/migrate_azure_bronze.sh). Как он работает,
+описано в [data-flow.md](data-flow.md#перенос-старых-данных-из-azure-однократно). Выполнять после шага 6,
+когда bronze-бакет и таблицы уже существуют.
 
-Дальше я делаю сам: Storage Transfer Service копирует файлы во временный префикс bronze-бакета, потом
-скрипт раскладывает их под `<source>/<dataset>/snapshot_date=D/<country>_<feed>.json`, и Dataform
-пересчитывает silver за все дни.
+- [ ] Узнать имя storage account в Azure: Portal → Storage accounts. Container с сырыми данными называется
+  `bronze`, внутри лежат папки `appstore_rss/` и `appstore_itunes/`.
+- [ ] Создать SAS-токен: Portal → storage account → Containers → `bronze` → Shared access tokens →
+  Permissions: **Read + List**, срок — неделя → Generate. Скопировать **Blob SAS token**. В чат его не
+  присылайте, скрипт спросит токен сам и нигде его не сохранит.
+- [ ] Проверить сопоставление путей (ничего не создаёт):
+  ```bash
+  AZURE_ACCOUNT=<имя> scripts/migrate_azure_bronze.sh --dry-run
+  ```
+- [ ] Запустить перенос и дождаться конца (скрипт покажет прогресс и количество перенесённых дней):
+  ```bash
+  AZURE_ACCOUNT=<имя> scripts/migrate_azure_bronze.sh
+  ```
+- [ ] Пересобрать silver за все дни:
+  ```bash
+  gcloud workflows run cubelake-daily --location europe-central2 --data='{"rebuild_silver": true}'
+  ```
+- [ ] Сверить: число дней в silver ≈ число дней в Azure.
+  ```bash
+  bq query --use_legacy_sql=false 'SELECT COUNT(DISTINCT snapshot_date) FROM silver_apple_rss.top_apps'
+  ```
+- [ ] Отозвать SAS-токен в Azure (или дождаться окончания срока).
 
 ## 8. Потом
 

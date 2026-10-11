@@ -16,6 +16,11 @@ main:
           - condition: ${args != null and "snapshot_date" in args}
             assign:
               - snapshot_date: ${args.snapshot_date}
+    # {"rebuild_silver": true}: no ingest; Dataform re-reads every bronze day (e.g. after the Azure migration).
+    - rebuild_check:
+        switch:
+          - condition: ${args != null and "rebuild_silver" in args and args.rebuild_silver == true}
+            next: rebuild_apple_rss_silver
     - apple_rss_bronze:
         call: ingest
         args:
@@ -50,6 +55,24 @@ main:
           silver_bucket: "${silver_bucket}"
     - done:
         return: ${"cubelake-daily finished for " + snapshot_date}
+    - rebuild_apple_rss_silver:
+        call: dataform
+        args:
+          repository: "${dataform_repo}"
+          project: "${project}"
+          tag: "apple_rss"
+          snapshot_date: ""
+          silver_bucket: "${silver_bucket}"
+    - rebuild_apple_itunes_silver:
+        call: dataform
+        args:
+          repository: "${dataform_repo}"
+          project: "${project}"
+          tag: "apple_itunes"
+          snapshot_date: ""
+          silver_bucket: "${silver_bucket}"
+    - rebuilt:
+        return: "cubelake-daily rebuilt silver for all bronze days"
 
 # Runs the ingest Cloud Run job for one source and waits for it to finish.
 ingest:

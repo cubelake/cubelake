@@ -11,8 +11,7 @@ def main() -> None:
     args = parser.parse_args()
     snapshot_date = args.date.isoformat()
 
-    # Imports stay inside the branches: each source only loads its own module.
-    # Settings() fields come from env vars (pydantic-settings), which type checkers can't see.
+
     if args.source == "apple-rss":
         from cubelake_ingest.apple_rss import config, ingest
 

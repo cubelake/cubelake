@@ -34,8 +34,11 @@ not exist yet — cloud code is validated offline only.
 
 ## Docs
 
-`docs/` (Russian): architecture, data (storage map, formats, columns), operations, owner-tasks (GCP setup
+`docs/` (Russian): architecture, data-flow (diagrams, run modes incl. `rebuild_silver`), data (storage map, formats, columns), operations, owner-tasks (GCP setup
 checklist). Keep them in sync when changing paths, tables, columns, IAM or deploy steps.
+
+`scripts/migrate_azure_bronze.sh` — one-off Storage Transfer of old Azure bronze (`appstore_rss/`,
+`appstore_itunes/`) into the new bronze prefixes.
 
 ## Commands
 
