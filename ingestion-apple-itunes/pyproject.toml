@@ -1,0 +1,25 @@
+[project]
+name = "ingestion-apple-itunes"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "appstore-core",
+    "httpx>=0.28.1",
+    "loguru>=0.7.3",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ingestion_apple_itunes*"]
+
+[tool.uv.sources]
+appstore-core = { workspace = true }
+
+[tool.ty.environment]
+extra-paths = ["../appstore-core"]
