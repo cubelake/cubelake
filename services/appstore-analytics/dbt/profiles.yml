@@ -1,8 +1,0 @@
-# No secrets here: storage location/credentials come from LAKE_* env vars (APPSTORE_ANALYTICS_*, see macros/storage.sql).
-appstore_analytics:
-  target: lake
-  outputs:
-    lake:
-      type: duckdb
-      path: ":memory:"
-      threads: 4
