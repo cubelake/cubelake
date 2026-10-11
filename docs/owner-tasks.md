@@ -6,9 +6,9 @@
 ## 0. Решения и безопасность (сейчас)
 
 - [x] **Слить ветку `lakehouse` в `main`** — PR #5 влит.
-- [ ] **CI зелёный на `main`.** Проверка `secrets` падала: `gitleaks-action` требует платную лицензию для
-  репозиториев организации. Заменена на бесплатный gitleaks CLI (PR с исправлением). Влейте PR и
-  убедитесь, что в Actions все 4 job зелёные.
+- [x] **CI зелёный на `main`.** Проверка `secrets` падала: `gitleaks-action` требует платную лицензию для
+  репозиториев организации. Заменена на бесплатный gitleaks CLI (PR #6, влит);
+  все 4 job на `main` зелёные.
 - [ ] **Отозвать `PARENT_REPO_TOKEN`.** Это старый GitHub-токен из прежней схемы с подмодулями. Секрет с ним
   остался в 6 архивных репозиториях (`appstore-transform`, `appstore-dags`, `ingestion-apple-itunes`,
   `ingestion-apple-rss`, `appstore-core`, `infra`). Из архивного репозитория секрет удалить нельзя, поэтому
@@ -44,15 +44,23 @@
 
 ## 3. Аккаунт и проект Google Cloud
 
-- [ ] Зарегистрироваться на https://console.cloud.google.com. Новым аккаунтам дают $300 кредитов на 90 дней.
-- [ ] Создать **billing account** (Billing → Create account), привязать карту.
+- [x] Аккаунт Google Cloud есть (`mykhailolaskavyi@gmail.com`), `gcloud auth login` выполнен.
+- [x] **Организация.** У аккаунта три организации `mykhailolaskavyi-org`: Google создаёт новую при каждом
+  онбординге в консоли. Удалить их нельзя, они пустые и бесплатные. Работаем только в
+  **`230879006059`** (самая старая). Старые проекты (три «My First Project», `bigq-test`, `ethereal-shine`,
+  `summery-ai`) удалены 2026-10-11 и окончательно сотрутся около 2026-11-10; до этого их можно вернуть
+  командой `gcloud projects undelete <id>`.
+- [ ] Создать **billing account** в этой организации (ссылка уже выбирает её):
+  https://console.cloud.google.com/billing/create?organizationId=230879006059.
+  Новым аккаунтам дают $300 кредитов на 90 дней. Банк временно заблокирует на карте около NOK 540 для
+  проверки, блокировка снимается в течение недели.
 - [ ] **Бюджет с оповещением:** Billing → Budgets & alerts → Create budget, например $10 в месяц,
   уведомления на 50/90/100%. Это защитит от неожиданных счетов.
 - [ ] Создать dev-проект. Имя по нашему правилу: `prj-d-cubelake-<4 случайных символа>`.
   ```bash
   gcloud auth login
   P=prj-d-cubelake-$(openssl rand -hex 2)      # запомните это значение
-  gcloud projects create $P
+  gcloud projects create $P --organization=230879006059
   gcloud billing accounts list                 # возьмите ACCOUNT_ID
   gcloud billing projects link $P --billing-account=<ACCOUNT_ID>
   gcloud config set project $P
