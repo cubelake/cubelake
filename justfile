@@ -1,49 +1,29 @@
-# cubelake — common developer commands. Run `just` with no arguments
-# to see this list. Requires https://github.com/casey/just.
+# cubelake — every service is an independent uv project; this file only fans out to them.
+# Requires https://github.com/casey/just.
+
+services := "apple-rss apple-itunes appstore-analytics"
 
 default:
     @just --list
 
-# Install every workspace package into .venv (plain `uv sync` won't — see README)
+# Install each service's own environment (services/<name>/.venv)
 setup:
-    uv sync --all-packages
+    for s in {{ services }}; do (cd services/$s && uv sync); done
 
-# Run the ingestion library test suites
+# Run every service's tests
 test:
-    uv run pytest ingestion-apple-rss/tests/ ingestion-apple-itunes/tests/ -v
+    for s in {{ services }}; do echo "== $s"; (cd services/$s && uv run pytest -q) || exit 1; done
 
-# --- Airflow (Docker Compose), delegates to infra/appstore-dags/justfile ---
+# Build every service image
+images:
+    for s in {{ services }}; do docker build -t $s:local services/$s; done
 
-# First-time setup: DB migration + admin user
+# --- Airflow runtime (platform/airflow) ---
 airflow-init:
-    just -f infra/appstore-dags/justfile init
-
-# Start the full Airflow stack
+    just -f platform/airflow/justfile init
 airflow-up:
-    just -f infra/appstore-dags/justfile up
-
-# Stop the Airflow stack
+    just -f platform/airflow/justfile up
 airflow-down:
-    just -f infra/appstore-dags/justfile down
-
-# Follow Airflow container logs
+    just -f platform/airflow/justfile down
 airflow-logs:
-    just -f infra/appstore-dags/justfile logs
-
-# --- dbt ---
-
-# Verify the DuckDB connection and Azure secrets
-dbt-debug:
-    uv run --env-file .env dbt debug --project-dir appstore-transform
-
-# Run all models for a given snapshot date, e.g. `just dbt-run 2026-07-24`
-dbt-run date:
-    uv run --env-file .env dbt run --project-dir appstore-transform --vars '{"snapshot_date": "{{ date }}"}'
-
-# Run only the gold models for a given snapshot date
-dbt-run-gold date:
-    uv run --env-file .env dbt run --project-dir appstore-transform --select marts/gold --vars '{"snapshot_date": "{{ date }}"}'
-
-# Run dbt tests
-dbt-test:
-    uv run --env-file .env dbt test --project-dir appstore-transform
+    just -f platform/airflow/justfile logs

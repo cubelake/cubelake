@@ -1,7 +1,0 @@
-from common.storage.containers import (
-    ADLS_BRONZE_CONTAINER,
-    ADLS_GOLD_CONTAINER,
-    ADLS_SILVER_CONTAINER,
-)
-
-__all__ = ["ADLS_BRONZE_CONTAINER", "ADLS_SILVER_CONTAINER", "ADLS_GOLD_CONTAINER"]

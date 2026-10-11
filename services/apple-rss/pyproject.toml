@@ -1,0 +1,40 @@
+[project]
+name = "apple-rss"
+version = "0.1.0"
+description = "Apple RSS top charts: extract → bronze → dbt silver (silver_top_apps)"
+requires-python = ">=3.13"
+dependencies = [
+    "dbt-duckdb>=1.10.1",
+    "duckdb>=1.2.0",
+    "fsspec>=2025.1.0",
+    "gcsfs>=2025.1.0",
+    "httpx>=0.28.1",
+    "loguru>=0.7.3",
+    "pydantic-settings>=2.6.0",
+]
+
+[project.scripts]
+apple-rss = "apple_rss.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "types-jsonschema>=4.26.0.20261006",
+    "types-networkx>=3.6.1.20261006",
+    "types-protobuf>=7.35.1.20260906",
+    "types-pygments>=2.21.0.20260819",
+    "types-python-dateutil>=2.9.0.20260807",
+    "types-pytz>=2026.5.0.20261006",
+    "types-pyyaml>=6.0.12.20260906",
+    "types-requests>=2.33.0.20261006",
+    "types-requests-oauthlib>=2.0.0.20261006",
+    "types-six>=1.17.0.20261008",
+    "types-tabulate>=0.10.0.20261006",
+]
+
+[tool.pytest.ini_options]
+addopts = "--import-mode=importlib"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

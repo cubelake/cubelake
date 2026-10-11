@@ -1,0 +1,17 @@
+name: apple_itunes
+version: 1.0.0
+config-version: 2
+profile: apple_itunes
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+target-path: "target"
+clean-targets: ["target"]
+
+on-run-start:
+  - "{{ storage_setup() }}"
+
+models:
+  apple_itunes:
+    staging:
+      +materialized: table

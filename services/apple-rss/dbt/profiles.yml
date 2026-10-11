@@ -1,0 +1,8 @@
+# No secrets here: storage location/credentials come from LAKE_* env vars (APPLE_RSS_*, see macros/storage.sql).
+apple_rss:
+  target: lake
+  outputs:
+    lake:
+      type: duckdb
+      path: ":memory:"
+      threads: 4

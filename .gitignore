@@ -34,12 +34,11 @@ logs/
 
 # dbt
 .user.yml
+dbt/target/
+dbt/logs/
 
 # AI
 .claude
-
-# Internal business notes — not part of the public portfolio
-analytics/
 
 # Terraform (if running locally)
 *.tfstate
