@@ -1,0 +1,10 @@
+# Dataform project (must sit at the repo root for managed Dataform): raw (bronze, BigLake external tables) → normalized (silver, Iceberg managed tables).
+# defaultProject / vars are placeholders: the cubelake-daily workflow sets the project and vars on every compile.
+defaultProject: cubelake-dev
+defaultLocation: europe-central2
+defaultDataset: dataform
+defaultAssertionDataset: dataform_assertions
+dataformCoreVersion: 3.0.71
+vars:
+  snapshot_date: ""     # YYYY-MM-DD; empty = rebuild every snapshot (full refresh)
+  silver_bucket: cbl-d-silver-placeholder

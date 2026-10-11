@@ -1,0 +1,139 @@
+# Daily pipeline: bronze (ingest) → silver (Dataform) per source. Triggered by Cloud Scheduler; run by hand with
+# {"snapshot_date": "YYYY-MM-DD"} to re-process a day. Env vars are set by Terraform.
+main:
+  params: [args]
+  steps:
+    - init:
+        assign:
+          - project: ${sys.get_env("GOOGLE_CLOUD_PROJECT_ID")}
+          - region: ${sys.get_env("REGION")}
+          - ingest_job: ${sys.get_env("INGEST_JOB")}
+          - dataform_repo: ${sys.get_env("DATAFORM_REPOSITORY")}
+          - silver_bucket: ${sys.get_env("SILVER_BUCKET")}
+          - snapshot_date: ${text.substring(time.format(sys.now()), 0, 10)}
+    - date_override:
+        switch:
+          - condition: ${args != null and "snapshot_date" in args}
+            assign:
+              - snapshot_date: ${args.snapshot_date}
+    # {"rebuild_silver": true}: no ingest; Dataform re-reads every bronze day (e.g. after the Azure migration).
+    - rebuild_check:
+        switch:
+          - condition: ${args != null and "rebuild_silver" in args and args.rebuild_silver == true}
+            next: rebuild_apple_rss_silver
+    - apple_rss_bronze:
+        call: ingest
+        args:
+          project: "${project}"
+          region: "${region}"
+          job: "${ingest_job}"
+          source: "apple-rss"
+          snapshot_date: "${snapshot_date}"
+    - apple_rss_silver:
+        call: dataform
+        args:
+          repository: "${dataform_repo}"
+          project: "${project}"
+          tag: "apple_rss"
+          snapshot_date: "${snapshot_date}"
+          silver_bucket: "${silver_bucket}"
+    - apple_itunes_bronze:
+        call: ingest
+        args:
+          project: "${project}"
+          region: "${region}"
+          job: "${ingest_job}"
+          source: "apple-itunes"
+          snapshot_date: "${snapshot_date}"
+    - apple_itunes_silver:
+        call: dataform
+        args:
+          repository: "${dataform_repo}"
+          project: "${project}"
+          tag: "apple_itunes"
+          snapshot_date: "${snapshot_date}"
+          silver_bucket: "${silver_bucket}"
+    - done:
+        return: ${"cubelake-daily finished for " + snapshot_date}
+    - rebuild_apple_rss_silver:
+        call: dataform
+        args:
+          repository: "${dataform_repo}"
+          project: "${project}"
+          tag: "apple_rss"
+          snapshot_date: ""
+          silver_bucket: "${silver_bucket}"
+    - rebuild_apple_itunes_silver:
+        call: dataform
+        args:
+          repository: "${dataform_repo}"
+          project: "${project}"
+          tag: "apple_itunes"
+          snapshot_date: ""
+          silver_bucket: "${silver_bucket}"
+    - rebuilt:
+        return: "cubelake-daily rebuilt silver for all bronze days"
+
+# Runs the ingest Cloud Run job for one source and waits for it to finish.
+ingest:
+  params: [project, region, job, source, snapshot_date]
+  steps:
+    - run:
+        call: googleapis.run.v2.projects.locations.jobs.run
+        args:
+          name: ${"projects/" + project + "/locations/" + region + "/jobs/" + job}
+          body:
+            overrides:
+              containerOverrides:
+                - args: ["${source}", "--date", "${snapshot_date}"]
+        result: execution
+    - ok:
+        return: ${execution.name}
+
+# Compiles the Dataform project for one day and runs the actions tagged `tag` (plus assertions).
+dataform:
+  params: [repository, project, tag, snapshot_date, silver_bucket]
+  steps:
+    - compile:
+        call: googleapis.dataform.v1beta1.projects.locations.repositories.compilationResults.create
+        args:
+          parent: ${repository}
+          body:
+            gitCommitish: main
+            codeCompilationConfig:
+              defaultDatabase: ${project}
+              vars:
+                snapshot_date: ${snapshot_date}
+                silver_bucket: ${silver_bucket}
+        result: compilation
+    - compile_errors:
+        switch:
+          - condition: ${"compilationErrors" in compilation}
+            raise: ${compilation.compilationErrors}
+    - invoke:
+        call: googleapis.dataform.v1beta1.projects.locations.repositories.workflowInvocations.create
+        args:
+          parent: ${repository}
+          body:
+            compilationResult: ${compilation.name}
+            invocationConfig:
+              includedTags: ["${tag}"]
+              transitiveDependenciesIncluded: false
+        result: invocation
+    - wait:
+        call: sys.sleep
+        args:
+          seconds: 20
+    - poll:
+        call: googleapis.dataform.v1beta1.projects.locations.repositories.workflowInvocations.get
+        args:
+          name: "${invocation.name}"
+        result: status
+    - check:
+        switch:
+          - condition: ${status.state == "RUNNING"}
+            next: wait
+          - condition: ${status.state != "SUCCEEDED"}
+            raise: '${"Dataform " + tag + " " + status.state + " " + invocation.name}'
+    - ok:
+        return: ${status.state}

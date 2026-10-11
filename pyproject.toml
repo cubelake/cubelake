@@ -1,0 +1,56 @@
+[project]
+name = "cubelake-ingest"
+version = "0.1.0"
+description = "Pulls Apple App Store APIs into the cubelake raw (bronze) zone; runs as Cloud Run jobs"
+requires-python = ">=3.13"
+dependencies = [
+    "fsspec>=2025.1.0",
+    "gcsfs>=2025.1.0",
+    "google-cloud-bigquery>=3.27.0",
+    "httpx>=0.28.1",
+    "loguru>=0.7.3",
+    "pydantic-settings>=2.6.0",
+]
+
+[project.scripts]
+cubelake-ingest = "cubelake_ingest.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "import-linter>=2.1",
+    "types-protobuf>=7.35.1.20260906",
+    "types-pygments>=2.21.0.20260819",
+    "types-python-dateutil>=2.9.0.20260807",
+    "types-requests>=2.33.0.20261006",
+    "types-requests-oauthlib>=2.0.0.20261006",
+    "types-six>=1.17.0.20261008",
+]
+
+# Editor type checking (Pylance/pyright) uses the project venv created by `uv sync`.
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+include = ["src", "tests"]
+
+[tool.pytest.ini_options]
+addopts = "--import-mode=importlib"
+
+# Module boundaries: each source is self-contained; both may use core, core uses neither.
+[tool.importlinter]
+root_package = "cubelake_ingest"
+
+[[tool.importlinter.contracts]]
+name = "Sources are independent"
+type = "independence"
+modules = ["cubelake_ingest.apple_rss", "cubelake_ingest.apple_itunes"]
+
+[[tool.importlinter.contracts]]
+name = "Core does not depend on sources"
+type = "forbidden"
+source_modules = ["cubelake_ingest.core"]
+forbidden_modules = ["cubelake_ingest.apple_rss", "cubelake_ingest.apple_itunes"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

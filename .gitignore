@@ -1,3 +1,29 @@
+# Python
+__pycache__/
+*.py[oc]
+.venv
+.pytest_cache
+.ruff_cache
+.import_linter_cache
+
+# Node / Dataform
+node_modules/
+.df-credentials.json
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terraform.lock.hcl.bak
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# OS / editors / AI
 .DS_Store
 .idea/
 .vscode/
