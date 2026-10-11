@@ -26,5 +26,3 @@ resource "google_project_service" "apis" {
   service            = each.value
   disable_on_destroy = false
 }
-
-data "google_project" "this" {}

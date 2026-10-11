@@ -96,7 +96,7 @@ Cloud Scheduler  "17 6 * * *" UTC
 | `storage.tf` | бакеты bronze (с версионированием, Nearline после 90 дней) и silver |
 | `bigquery.tf` | датасеты, BigLake connection `lake`, connection по умолчанию для Iceberg, bronze external tables (схемы в `schemas/*.json`) |
 | `ingest.tf` | Artifact Registry `cubelake`, `sa-ingest`, Cloud Run job |
-| `dataform.tf` | Dataform repository (берёт код из GitHub, токен в Secret Manager), `sa-dataform` |
+| `dataform.tf` | Dataform repository (берёт код из GitHub, токен в Secret Manager), сервисный агент Dataform, `sa-dataform` |
 | `orchestration.tf` | `sa-workflows`, workflow, Scheduler |
 
 ## Безопасность
@@ -129,7 +129,7 @@ Cloud Scheduler  "17 6 * * *" UTC
 | `python` | `uv sync --locked`, pytest, import-linter, сборку Docker-образа |
 | `dataform` | компиляцию SQLX; падает на ошибках компиляции |
 | `terraform` | `fmt -check`, `validate` |
-| `secrets` | gitleaks по всей истории |
+| `secrets` | gitleaks CLI по всей истории git (не `gitleaks-action`: ему нужна платная лицензия для организаций) |
 
 CD (сборка и выкладка образа, `terraform apply`) появится после создания GCP-проекта.
 
