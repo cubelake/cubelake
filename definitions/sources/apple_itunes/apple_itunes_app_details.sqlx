@@ -5,6 +5,8 @@ config {
   description: "iTunes metadata for every app charted that day, per country and feed.",
   tags: ["apple_itunes"],
   uniqueKey: ["snapshot_date", "country", "feed_type", "app_id"],
+  // MERGE only touches the processed day in the target, so it never scans the whole silver table.
+  updatePartitionFilter: snapshot.filter(),
   iceberg: { bucketName: dataform.projectConfig.vars.silver_bucket, tableFolderRoot: "iceberg" },
   bigquery: {
     partitionBy: "snapshot_date",

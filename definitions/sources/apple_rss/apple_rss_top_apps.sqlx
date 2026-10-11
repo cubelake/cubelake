@@ -5,6 +5,8 @@ config {
   description: "One row per app per chart (country × free/paid) per day, rank 1–100.",
   tags: ["apple_rss"],
   uniqueKey: ["snapshot_date", "country", "feed_type", "app_rank"],
+  // MERGE only touches the processed day in the target, so it never scans the whole silver table.
+  updatePartitionFilter: snapshot.filter(),
   iceberg: { bucketName: dataform.projectConfig.vars.silver_bucket, tableFolderRoot: "iceberg" },
   bigquery: {
     partitionBy: "snapshot_date",
