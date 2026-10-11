@@ -15,9 +15,9 @@ dataform-compile date="2026-01-01":
 tf-validate:
     cd infra/terraform && terraform fmt -check -recursive && terraform init -backend=false -input=false >/dev/null && terraform validate
 
-# Build the Cloud Run job image
+# Build the Cloud Run job image (Cloud Run needs linux/amd64, also on Apple Silicon)
 image:
-    docker build -t cubelake-ingest:local .
+    docker build --platform linux/amd64 -t cubelake-ingest:local .
 
 # Run one ingest locally into a folder, e.g. `just ingest apple-rss 2026-10-11 /tmp/lake`
 ingest source date root="/tmp/cubelake-lake":

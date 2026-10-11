@@ -92,16 +92,17 @@ just ingest apple-rss 2026-10-11 /tmp/lake   # real API pull into a local folder
 
 Running Dataform or the workflow needs a GCP project.
 
-## Deploying (first time)
+## Documentation
 
-1. Create the GCP project (`prj-d-cubelake-<rand>`) with billing; `gcloud auth application-default login`.
-2. Create a GCS bucket for Terraform state and a Secret Manager secret `dataform-github-token`
-   (read-only GitHub token for this repo).
-3. `cd infra/terraform && cp terraform.tfvars.example terraform.tfvars` and fill it in.
-4. `terraform init -backend-config="bucket=<state-bucket>" && terraform apply`.
-5. Build and push the ingest image to the `ingest_image` output, then re-apply with `ingest_image_tag`.
+| Doc | What |
+| --- | --- |
+| [docs/architecture.md](docs/architecture.md) | ELT layers, components, security, CI, what is verified |
+| [docs/data.md](docs/data.md) | where every piece of data lives, file/record formats, table columns, naming |
+| [docs/operations.md](docs/operations.md) | local dev, deploys, manual and backfill runs, troubleshooting, adding a source |
+| [docs/owner-tasks.md](docs/owner-tasks.md) | step-by-step checklist for the owner: GCP setup, first deploy, Azure migration |
 
-CD from GitHub Actions (Workload Identity Federation, no keys) comes next.
+First deploy: follow [docs/owner-tasks.md](docs/owner-tasks.md) (the Cloud Run job needs the image pushed
+before the full `terraform apply`).
 
 ## License
 

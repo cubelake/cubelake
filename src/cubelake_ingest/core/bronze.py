@@ -2,7 +2,7 @@
 
 Keys look like `<country>_<feed_type>` (e.g. `no_top_free`). One JSON-lines file per key:
 `<dataset>/snapshot_date=YYYY-MM-DD/<country>_<feed_type>.json`. Keep this format stable —
-the dbt staging models and already-ingested bronze data depend on it.
+the BigLake table schemas, silver Dataform models and already-ingested bronze data depend on it.
 """
 
 import json

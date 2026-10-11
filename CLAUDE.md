@@ -32,6 +32,11 @@ not exist yet — cloud code is validated offline only.
 - `infra/terraform/` — Dataform repo needs the `google-beta` provider. Bronze external table schemas are
   in `schemas/*.json`; keep them in sync with the SQLX models.
 
+## Docs
+
+`docs/` (Russian): architecture, data (storage map, formats, columns), operations, owner-tasks (GCP setup
+checklist). Keep them in sync when changing paths, tables, columns, IAM or deploy steps.
+
 ## Commands
 
 ```bash
