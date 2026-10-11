@@ -22,4 +22,17 @@ addopts = "--import-mode=importlib"
 [dependency-groups]
 dev = [
     "pytest>=9.0.3",
+    "types-cachetools>=7.0.0.20260713",
+    "types-croniter>=6.2.4.20261006",
+    "types-jsonschema>=4.26.0.20261006",
+    "types-networkx>=3.6.1.20261006",
+    "types-protobuf>=7.35.1.20260906",
+    "types-psutil>=7.2.2.20260906",
+    "types-pygments>=2.21.0.20260819",
+    "types-python-dateutil>=2.9.0.20260807",
+    "types-pytz>=2026.5.0.20261006",
+    "types-pyyaml>=6.0.12.20260906",
+    "types-requests>=2.33.0.20261006",
+    "types-six>=1.17.0.20261008",
+    "types-tabulate>=0.10.0.20261006",
 ]
