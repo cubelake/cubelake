@@ -44,7 +44,3 @@ dbt/logs/
 *.tfstate
 *.tfstate.backup
 .terraform/
-
-# Service and contract repos are cloned here by `just clone` (separate git repositories)
-/services/
-/contracts/

@@ -1,8 +1,9 @@
 # Airflow runtime for the cubelake services. Run from this directory:
 #   just init   (first time: generates secrets, builds service images, migrates DB)
 #   just up
-# Airflow only orchestrates: every task runs a service image (services/*/Dockerfile) through
-# the Docker socket proxy. Each service mounts its own DAG folder read-only.
+# Airflow only orchestrates: every task runs a service image (each service repo's Dockerfile) through
+# the Docker socket proxy. Each service repo's dags/ folder is mounted read-only; service repos
+# are expected next to this repo (override with CUBELAKE_REPOS).
 
 x-airflow-common:
   &airflow-common
@@ -23,9 +24,9 @@ x-airflow-common:
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
     DOCKER_HOST: tcp://docker-proxy:2375
   volumes:
-    - ../../services/apple-rss/dags:/opt/airflow/dags/apple_rss:ro
-    - ../../services/apple-itunes/dags:/opt/airflow/dags/apple_itunes:ro
-    - ../../services/appstore-analytics/dags:/opt/airflow/dags/appstore_analytics:ro
+    - ${CUBELAKE_REPOS:-../../..}/apple-rss/dags:/opt/airflow/dags/apple_rss:ro
+    - ${CUBELAKE_REPOS:-../../..}/apple-itunes/dags:/opt/airflow/dags/apple_itunes:ro
+    - ${CUBELAKE_REPOS:-../../..}/appstore-analytics/dags:/opt/airflow/dags/appstore_analytics:ro
     - airflow-logs:/opt/airflow/logs
   user: "50000:0"
   depends_on:
@@ -148,15 +149,15 @@ services:
 
   # Service images (built locally; in production they come from Artifact Registry).
   apple-rss:
-    build: ../../services/apple-rss
+    build: ${CUBELAKE_REPOS:-../../..}/apple-rss
     image: apple-rss:local
     profiles: ["images"]
   apple-itunes:
-    build: ../../services/apple-itunes
+    build: ${CUBELAKE_REPOS:-../../..}/apple-itunes
     image: apple-itunes:local
     profiles: ["images"]
   appstore-analytics:
-    build: ../../services/appstore-analytics
+    build: ${CUBELAKE_REPOS:-../../..}/appstore-analytics
     image: appstore-analytics:local
     profiles: ["images"]
 

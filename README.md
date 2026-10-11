@@ -49,9 +49,20 @@ output doesn't), so missed days and backfills are picked up automatically.
 
 Prerequisites: [uv](https://docs.astral.sh/uv/), [just](https://github.com/casey/just), Docker.
 
+All repos live side by side; this one never contains service code:
+
+```text
+workspace/
+  cubelake/              platform (this repo)
+  apple-rss/
+  apple-itunes/
+  appstore-analytics/
+  cubelake-contracts/
+```
+
 ```bash
 git clone https://github.com/Cubelake/cubelake.git && cd cubelake
-just clone     # services/<name> and contracts/ — separate git repos, git-ignored here
+just clone     # clones apple-rss, apple-itunes, appstore-analytics, cubelake-contracts next to this repo
 just setup     # uv sync in every service
 just test      # every service's tests + contract tests
 ```
