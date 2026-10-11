@@ -1,0 +1,48 @@
+config {
+  type: "incremental",
+  schema: "silver_apple_rss",
+  name: "top_apps",
+  description: "One row per app per chart (country × free/paid) per day, rank 1–100.",
+  tags: ["apple_rss"],
+  uniqueKey: ["snapshot_date", "country", "feed_type", "app_rank"],
+  iceberg: { bucketName: dataform.projectConfig.vars.silver_bucket, tableFolderRoot: "iceberg" },
+  bigquery: {
+    partitionBy: "snapshot_date",
+    clusterBy: ["country", "feed_type"],
+  },
+  assertions: {
+    nonNull: ["snapshot_date", "app_rank", "country", "feed_type"],
+    uniqueKey: ["snapshot_date", "country", "feed_type", "app_rank"],
+    rowConditions: ["feed_type IN ('free', 'paid')", "app_rank BETWEEN 1 AND 100"],
+  },
+  columns: {
+    snapshot_date: "Day the chart was collected (bronze partition).",
+    app_rank: "Position in the chart, 1 = top.",
+    country: "ISO 3166-1 alpha-2, upper case.",
+    feed_type: "free | paid.",
+    snapshot_updated: "Chart timestamp reported by Apple.",
+    app_id: "App Store id (trackId).",
+  },
+}
+
+SELECT
+  b.snapshot_date,
+  CAST(pos + 1 AS INT64)                                        AS app_rank,
+  UPPER(NULLIF(TRIM(b.country), ''))                            AS country,
+  CASE
+    WHEN b._feed_type LIKE '%paid%' THEN 'paid'
+    WHEN b._feed_type LIKE '%free%' THEN 'free'
+  END                                                           AS feed_type,
+  SAFE.PARSE_TIMESTAMP('%a, %d %b %Y %H:%M:%S %z', b.updated)   AS snapshot_updated,
+  SAFE_CAST(NULLIF(TRIM(r.id), '') AS INT64)                    AS app_id,
+  NULLIF(TRIM(r.name), '')                                      AS app_name,
+  NULLIF(TRIM(r.artistName), '')                                AS developer_name,
+  NULLIF(TRIM(r.url), '')                                       AS track_view_url,
+  NULLIF(TRIM(r.artworkUrl100), '')                             AS artwork_url,
+  SAFE_CAST(r.releaseDate AS TIMESTAMP)                         AS release_date,
+  CURRENT_TIMESTAMP()                                           AS _loaded_at
+FROM ${ref("bronze_apple_rss", "top_charts")} AS b,
+  UNNEST(b.results) AS r WITH OFFSET AS pos
+WHERE ${snapshot.filter("b.snapshot_date")}
+  AND b._feed_type IS NOT NULL
+  AND b.country IS NOT NULL

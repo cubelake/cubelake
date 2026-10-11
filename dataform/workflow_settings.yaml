@@ -1,0 +1,10 @@
+# Dataform project: raw (bronze, BigLake external tables) → normalized (silver, Iceberg managed tables).
+# defaultProject / vars are overridden per environment by the release configuration (Terraform).
+defaultProject: cubelake-dev
+defaultLocation: europe-central2
+defaultDataset: dataform
+defaultAssertionDataset: dataform_assertions
+dataformCoreVersion: 3.0.71
+vars:
+  snapshot_date: ""     # YYYY-MM-DD; empty = rebuild every snapshot (full refresh)
+  silver_bucket: cbl-d-silver-placeholder

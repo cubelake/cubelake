@@ -1,0 +1,76 @@
+config {
+  type: "incremental",
+  schema: "silver_apple_itunes",
+  name: "app_details",
+  description: "iTunes metadata for every app charted that day, per country and feed.",
+  tags: ["apple_itunes"],
+  uniqueKey: ["snapshot_date", "country", "feed_type", "app_id"],
+  iceberg: { bucketName: dataform.projectConfig.vars.silver_bucket, tableFolderRoot: "iceberg" },
+  bigquery: {
+    partitionBy: "snapshot_date",
+    clusterBy: ["country", "feed_type"],
+  },
+  assertions: {
+    nonNull: ["snapshot_date", "country", "feed_type", "app_id"],
+    uniqueKey: ["snapshot_date", "country", "feed_type", "app_id"],
+    rowConditions: ["feed_type IN ('free', 'paid')", "price IS NULL OR price >= 0"],
+  },
+  columns: {
+    snapshot_date: "Day the lookup ran (bronze partition).",
+    app_id: "App Store id (trackId).",
+    price: "Price in `currency`, 2 decimals.",
+    average_user_rating: "All-time average rating, 0–5.",
+  },
+}
+
+SELECT
+  b.snapshot_date,
+  UPPER(NULLIF(TRIM(b.country), ''))                         AS country,
+  CASE
+    WHEN b._feed_type LIKE '%paid%' THEN 'paid'
+    WHEN b._feed_type LIKE '%free%' THEN 'free'
+  END                                                        AS feed_type,
+
+  r.trackId                                                  AS app_id,
+  NULLIF(TRIM(r.trackName), '')                              AS app_name,
+  NULLIF(TRIM(r.bundleId), '')                               AS bundle_id,
+  r.artistId                                                 AS developer_id,
+  NULLIF(TRIM(r.artistName), '')                             AS developer_name,
+  NULLIF(TRIM(r.sellerName), '')                             AS seller_name,
+  r.primaryGenreId                                           AS primary_genre_id,
+  NULLIF(TRIM(r.primaryGenreName), '')                       AS primary_genre_name,
+  r.genres,
+
+  ROUND(CAST(r.price AS NUMERIC), 2)                         AS price,
+  UPPER(NULLIF(TRIM(r.currency), ''))                        AS currency,
+
+  NULLIF(TRIM(r.version), '')                                AS version,
+  NULLIF(TRIM(r.minimumOsVersion), '')                       AS minimum_os_version,
+  r.fileSizeBytes                                            AS file_size_bytes,
+  NULLIF(TRIM(r.contentAdvisoryRating), '')                  AS content_advisory_rating,
+
+  SAFE_CAST(r.releaseDate AS TIMESTAMP)                      AS release_date,
+  SAFE_CAST(r.currentVersionReleaseDate AS TIMESTAMP)        AS current_version_release_date,
+
+  ROUND(CAST(r.averageUserRating AS NUMERIC), 2)             AS average_user_rating,
+  r.userRatingCount                                          AS user_rating_count,
+  ROUND(CAST(r.averageUserRatingForCurrentVersion AS NUMERIC), 2) AS average_rating_current_version,
+  r.userRatingCountForCurrentVersion                         AS rating_count_current_version,
+
+  NULLIF(TRIM(r.description), '')                            AS description,
+  NULLIF(TRIM(r.releaseNotes), '')                           AS release_notes,
+  NULLIF(TRIM(r.artworkUrl100), '')                          AS artwork_url,
+  NULLIF(TRIM(r.trackViewUrl), '')                           AS track_view_url,
+  r.languageCodesISO2A                                       AS language_codes,
+  r.advisories,
+  r.screenshotUrls                                           AS screenshot_urls,
+  r.ipadScreenshotUrls                                       AS ipad_screenshot_urls,
+
+  SAFE_CAST(b._ingested_at AS TIMESTAMP)                     AS ingested_at,
+  CURRENT_TIMESTAMP()                                        AS _loaded_at
+FROM ${ref("bronze_apple_itunes", "lookup")} AS b,
+  UNNEST(b.results) AS r
+WHERE ${snapshot.filter("b.snapshot_date")}
+  AND b._feed_type IS NOT NULL
+  AND b.country IS NOT NULL
+  AND r.trackId IS NOT NULL
