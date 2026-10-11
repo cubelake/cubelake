@@ -1,0 +1,23 @@
+[project]
+name = "appstore-dags"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "ingestion-apple-rss",
+    "ingestion-apple-itunes",
+    "appstore-core",
+    "apache-airflow>=3.2.0",
+    "azure-storage-file-datalake>=12.23.0",
+    "duckdb>=1.2.0",
+    "dbt-duckdb>=1.10.1",
+]
+
+[tool.uv.sources]
+ingestion-apple-rss = { workspace = true }
+ingestion-apple-itunes = { workspace = true }
+appstore-core = { workspace = true }
+
+[tool.ty.environment]
+extra-paths = ["../appstore-core", "../ingestion-apple-rss", "../ingestion-apple-itunes"]
