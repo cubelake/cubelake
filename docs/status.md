@@ -56,7 +56,8 @@ https://console.cloud.google.com/billing/create?organizationId=230879006059. Б�
 
 ## Параллельная Azure-версия
 
-Пока GCP на паузе, рабочая версия пайплайна живёт в Azure как отдельный проект (bronze + silver).
+Пока GCP на паузе, рабочая версия пайплайна живёт в Azure в отдельном репозитории
+`cubelake/cubelake-azure` (bronze + silver, Airflow на ноутбуке, DuckDB).
 Формат bronze у них общий (`_source`, `_ingested_at`, `_feed_type`, `country` + ответ API,
 `snapshot_date=YYYY-MM-DD/<country>_<feed>.json`), поэтому накопленные в Azure данные переносятся сюда
 скриптом без изменений.

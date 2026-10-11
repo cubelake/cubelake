@@ -14,7 +14,9 @@ class FetchConfig:
     retry_delay_seconds: float = 5.0
 
 
-async def fetch_json(urls: list[str], config: FetchConfig = FetchConfig()) -> dict[str, dict]:
+async def fetch_json(
+    urls: list[str], config: FetchConfig = FetchConfig()
+) -> dict[str, dict]:
     """GET every URL in polite batches, retrying failures. Returns only the URLs that succeeded."""
     logger.info("Collecting {} URLs", len(urls))
     async with httpx.AsyncClient(
@@ -59,7 +61,13 @@ async def _fetch_batches(
         batch = urls[i : i + config.batch_size]
         batch_results = await asyncio.gather(*[_fetch_one(client, u) for u in batch])
         ok = sum(1 for r in batch_results if r is not None)
-        logger.info("Batch {}/{}: ok={}, failed={}", batch_idx, total_batches, ok, len(batch) - ok)
+        logger.info(
+            "Batch {}/{}: ok={}, failed={}",
+            batch_idx,
+            total_batches,
+            ok,
+            len(batch) - ok,
+        )
         results.update(zip(batch, batch_results, strict=True))
 
         if i + config.batch_size < len(urls):

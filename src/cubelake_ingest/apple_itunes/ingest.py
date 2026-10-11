@@ -13,7 +13,9 @@ from cubelake_ingest.core.storage import partition, write_text
 SOURCE = "apple-itunes"
 
 
-def charted_rows(settings: Settings, snapshot_date: str) -> Iterable[tuple[str, str, int]]:
+def charted_rows(
+    settings: Settings, snapshot_date: str
+) -> Iterable[tuple[str, str, int]]:
     """(country, feed_type, app_id) charted that day, read from the apple-rss silver table."""
     client = bigquery.Client()
     job = client.query(
@@ -30,14 +32,24 @@ def group_app_ids(rows: Iterable[tuple[str, str, int]]) -> dict[str, list[str]]:
     """Group by bronze key `<country>_top_<free|paid>`, keeping chart order."""
     ids: dict[str, list[str]] = {}
     for country, feed_type, app_id in rows:
-        ids.setdefault(f"{country.lower()}_top_{feed_type.lower()}", []).append(str(app_id))
+        ids.setdefault(f"{country.lower()}_top_{feed_type.lower()}", []).append(
+            str(app_id)
+        )
     return ids
 
 
-def ingest(settings: Settings, snapshot_date: str, rows: Iterable[tuple[str, str, int]] | None = None) -> int:
-    app_ids = group_app_ids(rows if rows is not None else charted_rows(settings, snapshot_date))
+def ingest(
+    settings: Settings,
+    snapshot_date: str,
+    rows: Iterable[tuple[str, str, int]] | None = None,
+) -> int:
+    app_ids = group_app_ids(
+        rows if rows is not None else charted_rows(settings, snapshot_date)
+    )
     if not app_ids:
-        raise RuntimeError(f"No charted apps in {settings.top_apps_table} for {snapshot_date}")
+        raise RuntimeError(
+            f"No charted apps in {settings.top_apps_table} for {snapshot_date}"
+        )
 
     urls = lookup_urls(app_ids)
     responses = asyncio.run(fetch_json(list(urls.values())))
