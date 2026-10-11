@@ -49,11 +49,12 @@ clustered by `country, feed_type`.
 Modular monolith — one repo, clear boundaries per source:
 
 ```text
-extract/                 Python (uv) — Cloud Run job image `cubelake-extract <source> --date D`
-  src/cubelake_extract/
-    core/                http fetching, bronze record format, storage writes
-    apple_rss/           top charts: countries, feed URLs, extract
-    apple_itunes/        lookups for charted apps
+pyproject.toml, uv.lock  Python (uv) project; Dockerfile → Cloud Run job image `cubelake-extract <source> --date D`
+src/cubelake_extract/
+  core/                  http fetching, bronze record format, storage writes
+  apple_rss/             top charts: countries, feed URLs, extract
+  apple_itunes/          lookups for charted apps
+tests/                   pytest
 workflow_settings.yaml   Dataform project (must be at the repo root for managed Dataform)
 definitions/             Dataform: sources (bronze), apple_rss/, apple_itunes/ (silver)
 includes/                Dataform helpers

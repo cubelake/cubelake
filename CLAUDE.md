@@ -14,7 +14,7 @@ not exist yet — cloud code is validated offline only.
 
 ## Layout and rules
 
-- `extract/` — uv project, package `cubelake_extract`, CLI `cubelake-extract <apple-rss|apple-itunes> --date D`.
+- Python (uv) project at the repo root (`pyproject.toml`, `src/cubelake_extract/`, `tests/`, `Dockerfile`), package `cubelake_extract`, CLI `cubelake-extract <apple-rss|apple-itunes> --date D`.
   - `core/` = http (batched async fetch with retries), bronze record format, storage writes.
   - `apple_rss/`, `apple_itunes/` = one module per source with its own `config.py` (env prefix
     `APPLE_RSS_` / `APPLE_ITUNES_`). **They must not import each other** (`uv run lint-imports`);
@@ -33,7 +33,7 @@ not exist yet — cloud code is validated offline only.
 ## Commands
 
 ```bash
-just test               # pytest + import-linter (extract/)
+just test               # pytest + import-linter
 just dataform-compile   # offline SQLX compile
 just tf-validate        # terraform fmt -check + validate (no backend)
 just check              # everything CI runs

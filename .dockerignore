@@ -1,0 +1,7 @@
+# Build context is the repo root; the image only needs the Python project.
+*
+!pyproject.toml
+!uv.lock
+!.python-version
+!src/
+**/__pycache__
