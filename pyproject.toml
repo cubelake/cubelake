@@ -27,6 +27,12 @@ dev = [
     "types-six>=1.17.0.20261008",
 ]
 
+# Editor type checking (Pylance/pyright) uses the project venv created by `uv sync`.
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+include = ["src", "tests"]
+
 [tool.pytest.ini_options]
 addopts = "--import-mode=importlib"
 
