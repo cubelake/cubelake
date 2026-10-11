@@ -1,0 +1,14 @@
+# secrets
+.env
+*.env
+
+# airflow runtime
+**/logs/
+**/plugins/
+**/dags/__pycache__/
+
+# docker
+**/postgres-db-volume/
+
+# os
+.DS_Store
