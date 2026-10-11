@@ -2,65 +2,31 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
+## This repo
 
-Cubelake is a data platform for Apple App Store data: a medallion lake (bronze → silver → gold) built
-from **independent ELT services, one per data source, each in its own git repository**. Airflow only
-orchestrates (runs service images via DockerOperator); dbt-duckdb does the transforms; storage is a
-local path in dev and GCS (`gs://`) in production (GCP not provisioned yet).
+`cubelake` holds **only the project overview** (README, LICENSE). There is no code here — do not add any.
+`.gitleaksignore` stays because the git history (merged from the old submodule repos) contains three
+revoked local-dev Airflow keys.
 
-## Repository layout
+## Where the code is
 
-This repo is the **platform** and contains no service code. Service and contract repos live **next to it**
-(`../apple-rss`, …), cloned by `just clone`; Airflow mounts `../<service>/dags` (override with `CUBELAKE_REPOS`):
+Separate git repositories, checked out **side by side** with this one (`../<name>`):
 
-| Path | Repo | Role |
-| --- | --- | --- |
-| `platform/airflow/` | this | docker-compose Airflow runtime (stock image, Postgres, docker-socket-proxy) |
-| `../apple-rss/` | Cubelake/apple-rss | RSS top charts → bronze → `silver_top_apps` |
-| `../apple-itunes/` | Cubelake/apple-itunes | iTunes lookup of charted apps → bronze → `silver_itunes_app_details` |
-| `../appstore-analytics/` | Cubelake/appstore-analytics | join both silvers → `silver_appstore_apps` → gold marts |
-| `../cubelake-contracts/` | Cubelake/cubelake-contracts | ODCS YAML contracts for every published dataset + `check()` |
+| Repo | Role |
+| --- | --- |
+| `apple-rss` | Apple RSS top charts → bronze → `silver_top_apps` |
+| `apple-itunes` | iTunes lookup of charted apps → bronze → `silver_itunes_app_details` |
+| `appstore-analytics` | join both silvers → `silver_appstore_apps` → gold marts |
+| `cubelake-contracts` | ODCS YAML contracts for every published dataset + `check()` |
+| `cubelake-platform` | Airflow docker-compose runtime; future Terraform/GCP and deploys |
 
-**Rule: services share no code.** Each has its own `config.py` (env prefix `APPLE_RSS_` /
-`APPLE_ITUNES_` / `APPSTORE_ANALYTICS_`), `storage.py`, `http.py`, `bronze.py`, `dbt.py`, dbt project
-with `macros/storage.sql`, DAG, Dockerfile, `uv.lock`. Duplication between services is intentional.
-Services interact only through lake datasets defined in `cubelake-contracts` and Airflow assets
-(`apple_rss_silver`, `apple_itunes_silver`, `appstore_gold`).
-
-## Commands
-
-```bash
-just clone          # clone/update service + contract repos
-just setup          # uv sync in each service
-just test           # each service's pytest + contract tests
-just images         # docker build each service
-
-# one service
-cd ../apple-rss && uv run pytest
-uv run apple-rss extract --date 2026-10-11      # needs APPLE_RSS_BRONZE_URI / APPLE_RSS_SILVER_URI
-uv run apple-rss pending                         # JSON list on the last stdout line
-uv run apple-rss transform --date 2026-10-11
-
-# Airflow (platform/airflow)
-just airflow-init   # generate .env secrets, build images, migrate DB
-just airflow-up     # http://localhost:8080
-just -f platform/airflow/justfile cli dags list
-```
-
-## Service CLI pattern
-
-Every service exposes `pending` (prints a JSON list of dates whose input exists but output doesn't, as
-the **last stdout line** — DAGs read it via DockerOperator XCom) plus per-date work commands. DAGs:
-`pending` → `dates_from` (skip if empty) → `DockerOperator.partial(...).expand(command=...)` → publish asset.
-For local paths the service must `ensure_dir()` the output partition before dbt, because DuckDB won't
-create directories.
-
-## Conventions
-
-- Lake paths: `<dataset_uri>/snapshot_date=YYYY-MM-DD/<file>`; bronze file per key `<country>_<feed>.json`.
-  Keep the bronze record format stable (`_source`, `_ingested_at`, `_feed_type`, `country`, payload).
-- dbt paths come from `{{ uri('<name>') }}` → env `<PREFIX><NAME>_URI`; never hardcode storage.
-- Changing a published dataset's columns/types requires a contract version bump in `cubelake-contracts`
-  (major for breaking changes).
-- Secrets only in `platform/airflow/.env` (generated, git-ignored). `just secrets` creates it.
+Rules across repos:
+- **Services share no code.** Each has its own config (env prefix `APPLE_RSS_` / `APPLE_ITUNES_` /
+  `APPSTORE_ANALYTICS_`), storage/http/bronze/dbt modules, dbt project, DAG, Dockerfile, `uv.lock`.
+  Duplication is intentional.
+- Services interact only through lake datasets defined in `cubelake-contracts` and Airflow assets
+  (`apple_rss_silver`, `apple_itunes_silver`, `appstore_gold`). Changing a published dataset needs a
+  contract version bump (major for breaking changes).
+- Every service CLI has `pending` (JSON list of dates on the last stdout line, read by DAGs via XCom)
+  plus per-date commands.
+- Secrets only in `cubelake-platform/.env` (generated by `just secrets`, git-ignored).
