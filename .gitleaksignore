@@ -1,0 +1,6 @@
+# Local-dev Airflow keys (fernet_key, secret_key, jwt_secret) committed in appstore-dags history
+# and removed in be4287d. Never used outside a laptop; production keys are generated fresh
+# and stored in Secret Manager. Do NOT reuse these values.
+92494ab5e7bfe257f76202da4ee472eeedf8f573:config/airflow.cfg:generic-api-key:171
+92494ab5e7bfe257f76202da4ee472eeedf8f573:config/airflow.cfg:generic-api-key:1210
+92494ab5e7bfe257f76202da4ee472eeedf8f573:config/airflow.cfg:generic-api-key:1491

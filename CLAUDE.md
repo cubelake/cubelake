@@ -8,9 +8,9 @@ Cubelake is a data engineering platform for ingesting, transforming, and analyzi
 
 ## Repository Structure
 
-This is a **uv workspace monorepo** composed of git submodules:
+This is a **uv workspace monorepo** (former git submodules were merged in with full history via `git subtree`):
 
-| Submodule | Role |
+| Package | Role |
 |-----------|------|
 | `appstore-core` | Shared library: base ingestion class, Pydantic data models, Azure/DuckDB abstractions |
 | `ingestion-apple-rss` | Async Apple RSS feed ingestion service |
@@ -23,14 +23,10 @@ This is a **uv workspace monorepo** composed of git submodules:
 
 ### Setup
 ```bash
-# Clone including submodules
-git clone --recurse-submodules <repo-url>
+git clone <repo-url>
 
-# After cloning without submodules
-git submodule update --init --recursive
-
-# Install all workspace dependencies
-uv sync
+# Install all workspace packages (plain `uv sync` installs only the empty root project)
+uv sync --all-packages
 ```
 
 ### Testing
@@ -151,14 +147,4 @@ SILVER_RSS_SAS_TOKEN=...
 SILVER_ITUNES_SAS_TOKEN=...
 GOLD_SAS_TOKEN=...
 DBT_PROJECT_DIR=/path/to/appstore-transform
-```
-
-## Submodule Workflow
-
-Each submodule has its own repository and CI pipeline. The parent repo (`cubelake`) pins submodules to specific commits. To update a submodule to its latest commit:
-
-```bash
-git submodule update --remote <submodule-name>
-git add <submodule-name>
-git commit -m "Update <submodule-name> submodule"
 ```

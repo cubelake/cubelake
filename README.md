@@ -116,9 +116,9 @@ models/
 
 ## Components
 
-The project is a monorepo of git submodules, each independently versioned:
+The project is a single uv-workspace monorepo (the former submodules were merged in with full history):
 
-| Submodule | Description |
+| Package | Description |
 |-----------|-------------|
 | [**appstore-core**](https://github.com/Cubelake/appstore-core) | Shared library — `BaseIngestor`, Azure storage abstractions, Pydantic data models |
 | [**appstore-dags**](https://github.com/Cubelake/appstore-dags) | Airflow DAGs — orchestrates bronze ingestion, silver & gold transformations |
@@ -161,18 +161,12 @@ The project is a monorepo of git submodules, each independently versioned:
 ### Install
 
 ```bash
-git clone --recurse-submodules https://github.com/Cubelake/cubelake.git
+git clone https://github.com/Cubelake/cubelake.git
 cd cubelake
 
 # installs every workspace member (appstore-core, ingestion-*, appstore-dags, appstore-transform) —
 # plain `uv sync` only installs the root project's own (empty) dependency set
 uv sync --all-packages
-```
-
-If you already cloned without submodules:
-
-```bash
-git submodule update --init --recursive
 ```
 
 ### Environment Variables
@@ -268,7 +262,7 @@ uv run pytest ingestion-apple-rss/tests/ ingestion-apple-itunes/tests/ -v
 
 Or: `just setup && just test`.
 
-Test coverage today is limited to URL/preset-key construction in the two ingestion libraries. `appstore-core` and `appstore-dags` have no automated tests yet, and `appstore-transform` has no dbt tests (`schema.yml` doesn't exist) — see each submodule's README for specifics.
+Test coverage today is limited to URL/preset-key construction in the two ingestion libraries. `appstore-core` and `appstore-dags` have no automated tests yet, and `appstore-transform` has no dbt tests (`schema.yml` doesn't exist) — see each package's README for specifics.
 
 ---
 
@@ -311,12 +305,12 @@ On every `dbt run`, on-run-start hooks create named DuckDB secrets for each ADLS
 
 ```
 cubelake/
-├── appstore-core/           # Shared library (submodule)
-├── appstore-dags/           # Airflow DAGs (submodule)
-├── appstore-transform/      # dbt project (submodule)
-├── ingestion-apple-rss/     # RSS ingestion library (submodule)
-├── ingestion-apple-itunes/  # iTunes ingestion library (submodule)
-├── infra/                   # Docker, CI/CD (submodule)
+├── appstore-core/           # Shared library
+├── appstore-dags/           # Airflow DAGs
+├── appstore-transform/      # dbt project
+├── ingestion-apple-rss/     # RSS ingestion library
+├── ingestion-apple-itunes/  # iTunes ingestion library
+├── infra/                   # Docker, CI/CD
 ├── justfile                 # `just <recipe>` — wraps setup/test/Airflow/dbt commands
 ├── pyproject.toml           # uv workspace root
 ├── uv.lock
@@ -332,7 +326,7 @@ This is an actively-evolving personal project, not a production system. Current 
 - **Test coverage** is limited to URL-construction unit tests in the two ingestion libraries; no tests exist yet for `appstore-core`, `appstore-dags`, or dbt models.
 - **dbt lineage is partial** — `silver_appstore_apps` and every gold model read via `read_parquet('azure://...')` globs instead of `{{ ref() }}`, so `dbt docs generate` won't show the full DAG past the RSS/iTunes silver layer. Execution order is enforced by the Airflow DAGs instead.
 - **`gold_fct_app_rank_history`** is documented as running "incrementally" but is a full recompute every run (`materialized='external'`, no dbt incremental logic) — the biweekly/monthly split is an orchestration decision, not a dbt materialization strategy.
-- **No CI beyond submodule-pointer sync** — each submodule's only GitHub Actions workflow bumps this repo's gitlink on push; there's no automated lint/test/build pipeline yet.
+- **No CI yet** — there's no automated lint/test/build pipeline yet.
 
 ## License
 
