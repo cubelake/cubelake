@@ -97,6 +97,7 @@ Running Dataform or the workflow needs a GCP project.
 
 | Doc | What |
 | --- | --- |
+| [docs/status.md](docs/status.md) | **start here**: where the project stopped, what blocks it, how to resume |
 | [docs/architecture.md](docs/architecture.md) | ELT layers, components, security, CI, what is verified |
 | [docs/data-flow.md](docs/data-flow.md) | diagrams: what runs when, by which identity, reading/writing what; deploy and Azure migration flow |
 | [docs/data.md](docs/data.md) | where every piece of data lives, file/record formats, table columns, naming |
