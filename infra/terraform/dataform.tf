@@ -22,8 +22,16 @@ resource "google_dataform_repository" "cubelake" {
   depends_on = [google_project_service.apis]
 }
 
+# The Dataform service agent only exists after it is provisioned; IAM bindings below fail without it.
+resource "google_project_service_identity" "dataform" {
+  provider = google-beta
+  service  = "dataform.googleapis.com"
+
+  depends_on = [google_project_service.apis]
+}
+
 locals {
-  dataform_agent = "serviceAccount:service-${data.google_project.this.number}@gcp-sa-dataform.iam.gserviceaccount.com"
+  dataform_agent = "serviceAccount:${google_project_service_identity.dataform.email}"
 }
 
 # Dataform's service agent reads the git token and acts as sa-dataform (strict act-as).

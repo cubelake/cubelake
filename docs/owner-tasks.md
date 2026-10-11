@@ -1,20 +1,24 @@
 # Что нужно сделать владельцу
 
-Задачи идут по порядку. Блоки 0–1 можно сделать прямо сейчас, остальным нужен аккаунт Google Cloud.
-Отмечайте `[x]` по мере выполнения. Если что-то пошло не так, пришлите текст ошибки.
+Задачи идут по порядку. Блоки 0–2 можно сделать прямо сейчас, остальным нужен аккаунт Google Cloud.
+`[x]` — уже сделано. Если что-то пошло не так, пришлите текст ошибки.
 
 ## 0. Решения и безопасность (сейчас)
 
-- [ ] **Слить ветку `lakehouse` в `main`.** Dataform в облаке компилирует только `main`, поэтому без
-  слияния он ничего не увидит. Варианты: PR (CI прогонит проверки) или прямой merge. Скажите, какой вариант
-  выбираете, и я сделаю push.
-- [ ] **Отозвать `PARENT_REPO_TOKEN`.** Это старый GitHub-токен из прежней схемы с подмодулями.
-  1. GitHub → аватар → Settings → Developer settings → Personal access tokens (fine-grained и classic).
-  2. Найти токен, которым пользовался `PARENT_REPO_TOKEN`, и нажать **Revoke**.
-  3. В бывших репозиториях: Settings → Secrets and variables → Actions → удалить `PARENT_REPO_TOKEN`
-     (если там ещё есть).
-- [ ] **Проверить, что репозитории приватные:** github.com/cubelake → Repositories, у каждого метка
-  **Private**.
+- [x] **Слить ветку `lakehouse` в `main`** — PR #5 влит.
+- [ ] **CI зелёный на `main`.** Проверка `secrets` падала: `gitleaks-action` требует платную лицензию для
+  репозиториев организации. Заменена на бесплатный gitleaks CLI (PR с исправлением). Влейте PR и
+  убедитесь, что в Actions все 4 job зелёные.
+- [ ] **Отозвать `PARENT_REPO_TOKEN`.** Это старый GitHub-токен из прежней схемы с подмодулями. Секрет с ним
+  остался в 6 архивных репозиториях (`appstore-transform`, `appstore-dags`, `ingestion-apple-itunes`,
+  `ingestion-apple-rss`, `appstore-core`, `infra`). Из архивного репозитория секрет удалить нельзя, поэтому
+  главное — отозвать сам токен, после этого значение в секретах ни на что не годится.
+  1. GitHub → аватар → Settings → Developer settings → Personal access tokens → **Fine-grained tokens** и
+     **Tokens (classic)**.
+  2. Найти токен, которым пользовался `PARENT_REPO_TOKEN` (по имени или по доступу к репозиториям
+     `cubelake/*`), и нажать **Delete / Revoke**.
+  3. Если не уверены, какой это токен, отзовите все старые токены, которыми больше не пользуетесь.
+- [x] **Репозитории приватные** — проверено: все 13 репозиториев `cubelake` — Private.
 
 ## 1. Уборка на ноутбуке (по желанию)
 
@@ -35,8 +39,8 @@
 
 ## 2. Инструменты
 
-- [ ] Google Cloud CLI: `brew install --cask google-cloud-sdk`, затем `gcloud --version`.
-- [ ] Остальное уже стоит, если `just check` проходит: uv, just, node, terraform, docker.
+- [x] Google Cloud CLI установлен (`/opt/homebrew/bin/gcloud`).
+- [x] uv, just, node, terraform, docker — стоят, `just check` проходит.
 
 ## 3. Аккаунт и проект Google Cloud
 
@@ -53,6 +57,7 @@
   gcloud billing projects link $P --billing-account=<ACCOUNT_ID>
   gcloud config set project $P
   gcloud auth application-default login        # даёт Terraform ваши права
+  gcloud auth application-default set-quota-project $P
   ```
 
 ## 4. Подготовка, которую Terraform не делает
