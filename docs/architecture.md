@@ -1,148 +1,148 @@
-# Архитектура
+# Architecture
 
-Cubelake собирает данные Apple App Store и раскладывает их по схеме
-[Google Cloud Lakehouse](https://docs.cloud.google.com/lakehouse/docs/key-concepts) (medallion).
-Сейчас в работе два слоя — **bronze** и **silver**. Gold (джойны, витрины) появится позже.
+Cubelake collects Apple App Store data and lays it out following the
+[Google Cloud Lakehouse](https://docs.cloud.google.com/lakehouse/docs/key-concepts) (medallion) pattern.
+Two layers are in scope right now — **bronze** and **silver**. Gold (joins, marts) comes later.
 
-## ELT: кто за что отвечает
+## ELT: who does what
 
-| Шаг | Что делает | Чем сделан | Где код |
+| Step | What it does | Built with | Code |
 | --- | --- | --- | --- |
-| **E + L** (ingest) | Забирает ответы API и кладёт их как есть в bronze-бакет | Python, Cloud Run job `cubelake-ingest` | `src/cubelake_ingest/` |
-| **T** (transform) | Превращает bronze в типизированные таблицы silver и проверяет качество | Dataform (SQLX) | `definitions/`, `includes/` |
-| Оркестрация | Каждый день по порядку запускает ingest → Dataform для каждого источника | Cloud Scheduler + Cloud Workflows | `workflows/cubelake-daily.yaml` |
-| Инфраструктура | Всё перечисленное выше плюс бакеты, датасеты, IAM | Terraform | `infra/terraform/` |
+| **E + L** (ingest) | Fetches API responses and stores them as-is in the bronze bucket | Python, Cloud Run job `cubelake-ingest` | `src/cubelake_ingest/` |
+| **T** (transform) | Turns bronze into typed silver tables and checks quality | Dataform (SQLX) | `definitions/`, `includes/` |
+| Orchestration | Runs ingest → Dataform for each source, in order, every day | Cloud Scheduler + Cloud Workflows | `workflows/cubelake-daily.yaml` |
+| Infrastructure | Everything above plus buckets, datasets, IAM | Terraform | `infra/terraform/` |
 
-Почему именно эти технологии: так рекомендует документация Google для serverless-lakehouse. Здесь нет
-VM, Airflow, dbt и DuckDB — нечего патчить и не за что платить, пока ничего не запущено.
+Why these technologies: this is what Google's documentation recommends for a serverless lakehouse. There is
+no VM, Airflow, dbt or DuckDB — nothing to patch and nothing to pay for while nothing is running.
 
-## Слои
+## Layers
 
-| Слой | Значение у Google | У нас | Хранение |
+| Layer | Meaning at Google | In this project | Storage |
 | --- | --- | --- | --- |
-| bronze | raw: данные как пришли | ответы Apple RSS / iTunes lookup | NDJSON в GCS → BigLake external tables в BigQuery |
-| silver | cleansed: очищено, типизировано | одна строка на сущность в день | Apache Iceberg managed tables в BigQuery (файлы в нашем бакете) |
-| gold | curated: бизнес-витрины | **пока нет** | — |
+| bronze | raw: data as received | Apple RSS / iTunes lookup responses | NDJSON in GCS → BigLake external tables in BigQuery |
+| silver | cleansed: cleaned, typed | one row per entity per day | Apache Iceberg managed tables in BigQuery (files in our bucket) |
+| gold | curated: business marts | **not yet** | — |
 
-Как устроены данные в каждом слое, описано в [data.md](data.md).
+How data is structured in each layer is described in [data.md](data.md).
 
-## Ежедневный поток
+## Daily flow
 
 ```text
 Cloud Scheduler  "17 6 * * *" UTC
-  └─ Workflows cubelake-daily (snapshot_date = сегодня по UTC или аргумент)
+  └─ Workflows cubelake-daily (snapshot_date = today in UTC, or the argument)
        1. apple_rss_bronze     Cloud Run job: cubelake-ingest apple-rss --date D
                                → gs://cbl-<env>-bronze-<rand>/apple_rss/top_charts/snapshot_date=D/*.json
        2. apple_rss_silver     Dataform: compile(main, vars) → run tag "apple_rss"
                                → silver_apple_rss.top_apps (+ assertions)
        3. apple_itunes_bronze  Cloud Run job: cubelake-ingest apple-itunes --date D
-                               (app_id берёт из silver_apple_rss.top_apps за день D)
+                               (reads app_id from silver_apple_rss.top_apps for day D)
                                → gs://…/apple_itunes/lookup/snapshot_date=D/*.json
        4. apple_itunes_silver  Dataform: run tag "apple_itunes"
                                → silver_apple_itunes.app_details (+ assertions)
 ```
 
-Шаги идут строго по очереди: iTunes нужен готовый silver от RSS. Если шаг падает, весь workflow
-останавливается с ошибкой, и следующие шаги не запускаются.
+Steps run strictly in sequence: iTunes needs the finished RSS silver. If a step fails, the whole workflow
+stops with an error and the remaining steps do not run.
 
-## Компоненты
+## Components
 
 ### Ingest (Python)
 
-- Один пакет `cubelake_ingest`, один образ и один Cloud Run job. Источник выбирается аргументом:
+- One package `cubelake_ingest`, one image and one Cloud Run job. The source is chosen by argument:
   `cubelake-ingest <apple-rss|apple-itunes> --date YYYY-MM-DD`.
-- `core/` — общий код:
-  - `http.py` — асинхронный GET пачками по 10 с паузой 4 с, таймаут 15 с, 2 повтора;
-  - `bronze.py` — формат записи;
-  - `storage.py` — запись через fsspec: `gs://…` в облаке, локальный путь в тестах.
-- `apple_rss/`, `apple_itunes/` — по модулю на источник, у каждого свой `config.py` (env `APPLE_RSS_*`,
-  `APPLE_ITUNES_*`). Источники **не импортируют друг друга**, а `core` не импортирует источники.
-  Это проверяет `import-linter` в CI.
-- Новый источник — новая папка рядом. Шаги описаны в [operations.md](operations.md#новый-источник).
+- `core/` — shared code:
+  - `http.py` — async GET in batches of 10 with a 4 s pause, 15 s timeout, 2 retries;
+  - `bronze.py` — record format;
+  - `storage.py` — writes via fsspec: `gs://…` in the cloud, a local path in tests.
+- `apple_rss/`, `apple_itunes/` — one module per source, each with its own `config.py` (env `APPLE_RSS_*`,
+  `APPLE_ITUNES_*`). Sources **do not import each other**, and `core` does not import sources.
+  `import-linter` enforces this in CI.
+- A new source is a new sibling folder. The steps are in [operations.md](operations.md#adding-a-new-source).
 
 ### Transform (Dataform)
 
-- Проект лежит в **корне репозитория** (`workflow_settings.yaml`), потому что managed Dataform не умеет
-  читать проект из подпапки.
-- Раскладка по [рекомендациям Google](https://docs.cloud.google.com/dataform/docs/best-practices-repositories):
-  - `definitions/sources/<source>/<source>.js` — объявление bronze-таблицы;
-  - `definitions/sources/<source>/<source>_<table>.sqlx` — silver-модель (`name:` задаёт имя таблицы);
-  - позже `definitions/intermediate/` (джойны) и `definitions/outputs/<entity>/` (gold).
-- Silver-модели устроены так:
-  - `type: "incremental"` с `uniqueKey`, то есть MERGE: повторный прогон дня ничего не дублирует;
+- The project lives at the **repository root** (`workflow_settings.yaml`) because managed Dataform cannot
+  read a project from a subdirectory.
+- Layout follows [Google's recommendations](https://docs.cloud.google.com/dataform/docs/best-practices-repositories):
+  - `definitions/sources/<source>/<source>.js` — bronze table declaration;
+  - `definitions/sources/<source>/<source>_<table>.sqlx` — silver model (`name:` sets the table name);
+  - later `definitions/intermediate/` (joins) and `definitions/outputs/<entity>/` (gold).
+- Silver models are built like this:
+  - `type: "incremental"` with `uniqueKey`, i.e. MERGE: re-running a day never duplicates anything;
   - Iceberg (`iceberg: { bucketName, tableFolderRoot: "iceberg" }`);
-  - партиция по `snapshot_date`, кластеризация по `country, feed_type`.
-- Переменные (`vars`) workflow передаёт при компиляции:
-  - `snapshot_date` — какой день обрабатывать; пусто = все дни;
+  - partitioned by `snapshot_date`, clustered by `country, feed_type`.
+- Variables (`vars`) are passed by the workflow at compile time:
+  - `snapshot_date` — which day to process; empty = all days;
   - `silver_bucket`.
-- Проверки качества записаны в `assertions` прямо в модели: not null, уникальность ключа, допустимые
-  значения. Если проверка падает, падает весь workflow.
+- Quality checks live in `assertions` inside the model: not null, key uniqueness, accepted
+  values. If a check fails, the whole workflow fails.
 
-### Оркестрация (Workflows + Scheduler)
+### Orchestration (Workflows + Scheduler)
 
-- `workflows/cubelake-daily.yaml` — основной сценарий и две подпрограммы:
-  - `ingest` запускает Cloud Run job и ждёт окончания;
-  - `dataform` компилирует ветку `main`, запускает нужный тег и опрашивает статус каждые 20 с.
-- Terraform прокидывает в workflow переменные окружения `REGION`, `INGEST_JOB`, `DATAFORM_REPOSITORY`,
-  `SILVER_BUCKET`.
-- Scheduler вызывает workflow с пустым аргументом, и тогда дата берётся по UTC.
+- `workflows/cubelake-daily.yaml` — the main flow and two subworkflows:
+  - `ingest` starts the Cloud Run job and waits for it to finish;
+  - `dataform` compiles the `main` branch, runs the requested tag and polls its status every 20 s.
+- Terraform passes the environment variables `REGION`, `INGEST_JOB`, `DATAFORM_REPOSITORY`,
+  `SILVER_BUCKET` into the workflow.
+- Scheduler calls the workflow with an empty argument, so the date is taken in UTC.
 
-### Инфраструктура (Terraform, `infra/terraform/`)
+### Infrastructure (Terraform, `infra/terraform/`)
 
-| Файл | Что создаёт |
+| File | What it creates |
 | --- | --- |
-| `versions.tf` | провайдеры google и google-beta (Dataform есть только в beta), state в GCS |
-| `main.tf` | включение API, случайный суффикс имён |
-| `storage.tf` | бакеты bronze (с версионированием, Nearline после 90 дней) и silver |
-| `bigquery.tf` | датасеты, BigLake connection `lake`, connection по умолчанию для Iceberg, bronze external tables (схемы в `schemas/*.json`) |
+| `versions.tf` | google and google-beta providers (Dataform is beta-only), state in GCS |
+| `main.tf` | API enablement, random name suffix |
+| `storage.tf` | bronze bucket (versioned, Nearline after 90 days) and silver bucket |
+| `bigquery.tf` | datasets, BigLake connection `lake`, default Iceberg connection, bronze external tables (schemas in `schemas/*.json`) |
 | `ingest.tf` | Artifact Registry `cubelake`, `sa-ingest`, Cloud Run job |
-| `dataform.tf` | Dataform repository (берёт код из GitHub, токен в Secret Manager), сервисный агент Dataform, `sa-dataform` |
+| `dataform.tf` | Dataform repository (pulls code from GitHub, token in Secret Manager), Dataform service agent, `sa-dataform` |
 | `orchestration.tf` | `sa-workflows`, workflow, Scheduler |
 
-## Безопасность
+## Security
 
-- **Ключей сервисных аккаунтов нет.** Всё в облаке работает от своих SA. CD из GitHub будет работать через
-  Workload Identity Federation, тоже без ключей.
-- **Минимальные права:**
+- **No service account keys.** Everything in the cloud runs as its own SA. CD from GitHub will use
+  Workload Identity Federation, also keyless.
+- **Least privilege:**
 
-  | Сервисный аккаунт | Может |
+  | Service account | Can |
   | --- | --- |
-  | `sa-ingest` | писать объекты в bronze-бакет, читать `silver_apple_rss`, запускать запросы BigQuery |
-  | `sa-dataform` | читать bronze-датасеты, писать silver и `dataform_assertions`, создавать Iceberg через connection `lake` |
-  | SA connection `lake` | читать bronze-бакет, писать silver-бакет (реальный файловый I/O BigQuery) |
-  | `sa-workflows` | запускать только job `cubelake-ingest`, работать с Dataform, писать логи |
+  | `sa-ingest` | write objects to the bronze bucket, read `silver_apple_rss`, run BigQuery jobs |
+  | `sa-dataform` | read bronze datasets, write silver and `dataform_assertions`, create Iceberg tables via connection `lake` |
+  | SA of connection `lake` | read the bronze bucket, write the silver bucket (BigQuery's actual file I/O) |
+  | `sa-workflows` | run only the `cubelake-ingest` job, use Dataform, write logs |
 
-- Бакеты: uniform bucket-level access, публичный доступ запрещён (`public_access_prevention = enforced`).
-- Имена бакетов не содержат имени проекта и заканчиваются случайным суффиксом, чтобы их было трудно угадать.
-- Секреты хранятся только в Secret Manager (GitHub-токен для Dataform). В репозитории секретов нет, это
-  проверяет `gitleaks` в CI. В `.gitleaksignore` записаны три старых локальных ключа Airflow из истории
-  git; они нигде не используются.
-- Образ запускается от непривилегированного пользователя (uid 10001), в образ попадают только
-  `pyproject.toml`, `uv.lock` и `src/`.
+- Buckets: uniform bucket-level access, public access blocked (`public_access_prevention = enforced`).
+- Bucket names do not contain the project name and end with a random suffix, so they are hard to guess.
+- Secrets live only in Secret Manager (the GitHub token for Dataform). There are no secrets in the repository;
+  `gitleaks` checks this in CI. `.gitleaksignore` lists three old local Airflow keys from git history;
+  they are not used anywhere.
+- The image runs as an unprivileged user (uid 10001); only `pyproject.toml`, `uv.lock` and `src/` go into
+  the image.
 
 ## CI (`.github/workflows/ci.yml`)
 
-Запускается на каждый PR и push в `main`. Облако для этого не нужно.
+Runs on every PR and push to `main`. No cloud needed.
 
-| Job | Проверяет |
+| Job | Checks |
 | --- | --- |
-| `python` | `uv sync --locked`, pytest, import-linter, сборку Docker-образа |
-| `dataform` | компиляцию SQLX; падает на ошибках компиляции |
+| `python` | `uv sync --locked`, pytest, import-linter, Docker image build |
+| `dataform` | SQLX compilation; fails on compile errors |
 | `terraform` | `fmt -check`, `validate` |
-| `secrets` | gitleaks CLI по всей истории git (не `gitleaks-action`: ему нужна платная лицензия для организаций) |
+| `secrets` | gitleaks CLI over the whole git history (not `gitleaks-action`: it needs a paid license for organizations) |
 
-CD (сборка и выкладка образа, `terraform apply`) появится после создания GCP-проекта.
+CD (build and push the image, `terraform apply`) comes after the GCP project is created.
 
-## Что проверено, а что нет
+## What is verified and what is not
 
-Проверено офлайн: тесты, границы модулей, компиляция Dataform, `terraform validate`, сборка образа,
-реальная выгрузка Apple RSS в локальную папку.
+Verified offline: tests, module boundaries, Dataform compilation, `terraform validate`, image build,
+a real Apple RSS pull into a local folder.
 
-**Не проверено, пока нет GCP:**
-- SQL в диалекте BigQuery (переписан вручную с DuckDB);
-- создание Iceberg-таблиц Dataform-ом;
+**Not verified until GCP exists:**
+- SQL in the BigQuery dialect (hand-ported from DuckDB);
+- Iceberg table creation by Dataform;
 - `ALTER PROJECT … default_cloud_resource_connection_id`;
-- синтаксис Workflows;
-- достаточность IAM-прав.
+- Workflows syntax;
+- sufficiency of IAM permissions.
 
-Первый прогон в облаке почти наверняка найдёт несколько ошибок, их надо будет поправить.
+The first cloud run will almost certainly surface a few errors that will need fixing.

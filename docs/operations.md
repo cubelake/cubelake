@@ -1,41 +1,41 @@
-# Эксплуатация
+# Operations
 
-## Локально (без облака)
+## Locally (no cloud)
 
-Нужны [uv](https://docs.astral.sh/uv/), [just](https://github.com/casey/just), Node 20+, Terraform 1.9+ и Docker.
+You need [uv](https://docs.astral.sh/uv/), [just](https://github.com/casey/just), Node 20+, Terraform 1.9+ and Docker.
 
 ```bash
-just check                                   # всё, что проверяет CI
+just check                                   # everything CI checks
 just test                                    # pytest + import-linter
-just dataform-compile 2026-10-11             # компиляция SQLX за выбранный день
+just dataform-compile 2026-10-11             # compile SQLX for a given day
 just tf-validate                             # terraform fmt + validate
-just ingest apple-rss 2026-10-11 /tmp/lake   # настоящий запрос к Apple в локальную папку
-just image                                   # Docker-образ для локальной проверки
+just ingest apple-rss 2026-10-11 /tmp/lake   # real request to Apple into a local folder
+just image                                   # Docker image for local testing
 ```
 
-`apple-itunes` локально не запустится: ему нужна таблица `silver_apple_rss.top_apps` в BigQuery.
+`apple-itunes` will not run locally: it needs the `silver_apple_rss.top_apps` table in BigQuery.
 
-Конфигурация ingest задаётся только переменными окружения:
+Ingest is configured only through environment variables:
 
-| Переменная | Пример |
+| Variable | Example |
 | --- | --- |
-| `APPLE_RSS_BRONZE_URI` | `gs://cbl-d-bronze-7f3c/apple_rss/top_charts` или локальный путь |
+| `APPLE_RSS_BRONZE_URI` | `gs://cbl-d-bronze-7f3c/apple_rss/top_charts` or a local path |
 | `APPLE_ITUNES_BRONZE_URI` | `gs://cbl-d-bronze-7f3c/apple_itunes/lookup` |
 | `APPLE_ITUNES_TOP_APPS_TABLE` | `prj-d-cubelake-a1b2.silver_apple_rss.top_apps` |
 
-В облаке эти переменные задаёт Terraform (`infra/terraform/ingest.tf`), `.env`-файлы не нужны.
+In the cloud these variables are set by Terraform (`infra/terraform/ingest.tf`); no `.env` files are needed.
 
-## Выкладка
+## Deploying
 
-Первичная настройка описана пошагово в [owner-tasks.md](owner-tasks.md). Дальнейшие изменения:
+Initial setup is described step by step in [owner-tasks.md](owner-tasks.md). Subsequent changes:
 
-| Что поменяли | Что сделать |
+| What changed | What to do |
 | --- | --- |
-| SQLX (`definitions/`) | смержить в `main`; Dataform сам берёт `main` при следующем запуске |
-| Python (`src/`) | собрать образ `linux/amd64`, запушить с тегом = git SHA, затем `terraform apply -var ingest_image_tag=<sha>` |
-| `workflows/*.yaml` или `infra/terraform/` | `terraform apply` |
+| SQLX (`definitions/`) | merge into `main`; Dataform picks up `main` on the next run |
+| Python (`src/`) | build a `linux/amd64` image, push it tagged with the git SHA, then `terraform apply -var ingest_image_tag=<sha>` |
+| `workflows/*.yaml` or `infra/terraform/` | `terraform apply` |
 
-Пока CD не настроен, всё это делается руками. Потом это будет делать GitHub Actions через WIF.
+Until CD is set up, all of this is done by hand. Later GitHub Actions will do it via WIF.
 
 ```bash
 SHA=$(git rev-parse --short HEAD)
@@ -44,86 +44,86 @@ docker build --platform linux/amd64 -t "$IMAGE:$SHA" . && docker push "$IMAGE:$S
 terraform -chdir=infra/terraform apply -var ingest_image_tag="$SHA"
 ```
 
-> На Mac с Apple Silicon `--platform linux/amd64` **обязателен**, иначе Cloud Run не запустит образ.
+> On Apple Silicon Macs `--platform linux/amd64` is **required**, otherwise Cloud Run will not start the image.
 
-## Запуск руками
+## Running by hand
 
 ```bash
-# весь пайплайн за сегодня (UTC)
+# whole pipeline for today (UTC)
 gcloud workflows run cubelake-daily --location europe-central2
 
-# за конкретный день (перезапуск или догрузка)
+# for a specific day (re-run or backfill)
 gcloud workflows run cubelake-daily --location europe-central2 --data='{"snapshot_date":"2026-10-11"}'
 
-# только один ingest
+# a single ingest only
 gcloud run jobs execute cubelake-ingest --region europe-central2 --args=apple-rss,--date,2026-10-11 --wait
 ```
 
-Перезапуск безопасен: bronze перезаписывает файлы своего дня, а silver делает MERGE по ключу.
+Re-running is safe: bronze overwrites the files of its day, and silver MERGEs by key.
 
-**Важно:** Apple отдаёт только текущие чарты. Если запустить ingest за прошлую дату, под этой датой
-запишется сегодняшний чарт. Запуск с `snapshot_date` имеет смысл только для перезапуска сегодняшнего или
-вчерашнего дня.
+**Important:** Apple serves only the current charts. If you run ingest for a past date, today's chart
+gets written under that date. Running with `snapshot_date` only makes sense to re-run today or
+yesterday.
 
-**Пересобрать silver за все дни** (после переноса из Azure или после изменения SQL):
+**Rebuild silver for all days** (after the Azure migration or after changing SQL):
 
 ```bash
 gcloud workflows run cubelake-daily --location europe-central2 --data='{"rebuild_silver": true}'
 ```
 
-Ingest при этом не запускается. Dataform компилируется с пустым `snapshot_date`, читает весь bronze и
-делает MERGE в silver. Если меняли схему silver-таблицы (колонки, ключ), сначала удалите таблицу или
-запустите тег с «full refresh» в консоли Dataform.
+Ingest does not run in this mode. Dataform compiles with an empty `snapshot_date`, reads all of bronze and
+MERGEs into silver. If you changed a silver table's schema (columns, key), first drop the table or
+run the tag with "full refresh" in the Dataform console.
 
-## Где смотреть, что случилось
+## Where to look when something breaks
 
-| Что | Где |
+| What | Where |
 | --- | --- |
-| Запуски пайплайна | Console → Workflows → `cubelake-daily` → Executions |
-| Логи ingest | Console → Cloud Run → Jobs → `cubelake-ingest` → Logs (строки `Batch i/N: ok=…, failed=…`, `Wrote X/Y`) |
-| Запуски Dataform и ошибки SQL | Console → Dataform → `cubelake` → Workflow execution logs |
-| Упавшая проверка качества | запрос к view из `dataform_assertions`: он возвращает плохие строки |
-| Файлы bronze | `gcloud storage ls gs://<bronze>/apple_rss/top_charts/snapshot_date=2026-10-11/` |
+| Pipeline runs | Console → Workflows → `cubelake-daily` → Executions |
+| Ingest logs | Console → Cloud Run → Jobs → `cubelake-ingest` → Logs (lines `Batch i/N: ok=…, failed=…`, `Wrote X/Y`) |
+| Dataform runs and SQL errors | Console → Dataform → `cubelake` → Workflow execution logs |
+| Failed quality check | query the view in `dataform_assertions`: it returns the bad rows |
+| Bronze files | `gcloud storage ls gs://<bronze>/apple_rss/top_charts/snapshot_date=2026-10-11/` |
 
-### Частые ошибки
+### Common errors
 
-| Симптом | Причина / что делать |
+| Symptom | Cause / what to do |
 | --- | --- |
-| `apple-rss` пишет `Wrote 200/350` | Apple RSS часто отвечает `ReadTimeout` и `502`. Записывается то, что удалось скачать, а остальное за этот день потеряно. Если не получилось ничего, job падает. Перезапустите день. |
-| `apple-itunes`: `No charted apps …` | silver за этот день пуст: шаг `apple_rss_silver` не прошёл или bronze пуст |
-| Dataform: `Cannot query … without a filter over column snapshot_date` | в модели нет `${snapshot.filter(...)}` по bronze-таблице |
-| Новые bronze-файлы не видны в BigQuery | кэш метаданных BigLake обновляется до 4 часов; можно выполнить `CALL BQ.REFRESH_EXTERNAL_METADATA_CACHE('<project>.bronze_apple_rss.top_charts')` |
-| Cloud Run: `exec format error` | образ собран под arm64; соберите заново с `--platform linux/amd64` |
+| `apple-rss` logs `Wrote 200/350` | Apple RSS often responds with `ReadTimeout` and `502`. Whatever was downloaded gets written; the rest is lost for that day. If nothing was downloaded, the job fails. Re-run the day. |
+| `apple-itunes`: `No charted apps …` | silver for that day is empty: the `apple_rss_silver` step failed or bronze is empty |
+| Dataform: `Cannot query … without a filter over column snapshot_date` | the model has no `${snapshot.filter(...)}` on the bronze table |
+| New bronze files are not visible in BigQuery | the BigLake metadata cache refreshes within 4 hours; you can run `CALL BQ.REFRESH_EXTERNAL_METADATA_CACHE('<project>.bronze_apple_rss.top_charts')` |
+| Cloud Run: `exec format error` | the image was built for arm64; rebuild with `--platform linux/amd64` |
 
-## Новый источник
+## Adding a new source
 
-Пример: источник `google_play`.
+Example: source `google_play`.
 
 1. **Ingest:**
-   - создать `src/cubelake_ingest/google_play/` с файлами `config.py` (env `GOOGLE_PLAY_*`) и
-     `ingest.py` (`ingest(settings, snapshot_date)`); писать через `core.bronze` и `core.storage`;
-   - добавить ветку в `cli.py`;
-   - дописать модуль в контракт `independence` в `pyproject.toml`;
-   - добавить тесты в `tests/google_play/`.
+   - create `src/cubelake_ingest/google_play/` with `config.py` (env `GOOGLE_PLAY_*`) and
+     `ingest.py` (`ingest(settings, snapshot_date)`); write via `core.bronze` and `core.storage`;
+   - add a branch in `cli.py`;
+   - add the module to the `independence` contract in `pyproject.toml`;
+   - add tests in `tests/google_play/`.
 2. **Bronze:**
-   - схема `infra/terraform/schemas/bronze_google_play_<dataset>.json`;
-   - датасеты `bronze_google_play` и `silver_google_play` и запись в `bronze_tables` в `bigquery.tf`;
-   - env-переменная в `ingest.tf`;
-   - права `sa-dataform` в `dataform.tf`.
+   - schema `infra/terraform/schemas/bronze_google_play_<dataset>.json`;
+   - datasets `bronze_google_play` and `silver_google_play` and an entry in `bronze_tables` in `bigquery.tf`;
+   - env variable in `ingest.tf`;
+   - `sa-dataform` permissions in `dataform.tf`.
 3. **Silver:**
    - `definitions/sources/google_play/google_play.js` (declare);
-   - `definitions/sources/google_play/google_play_<table>.sqlx` с `tags: ["google_play"]`.
-4. **Оркестрация:** шаги `google_play_bronze` и `google_play_silver` в `workflows/cubelake-daily.yaml`.
-5. Проверка: `just check`.
+   - `definitions/sources/google_play/google_play_<table>.sqlx` with `tags: ["google_play"]`.
+4. **Orchestration:** steps `google_play_bronze` and `google_play_silver` in `workflows/cubelake-daily.yaml`.
+5. Check: `just check`.
 
-## Затраты (ориентир)
+## Costs (rough)
 
-При текущем объёме (несколько сотен файлов по ~100 КБ в день) всё укладывается в бесплатные лимиты или в
-копейки:
-- Cloud Run job: несколько минут в день;
-- BigQuery on-demand: запросы с фильтром по партиции; MERGE в silver тоже трогает только обрабатываемый день
-  (`updatePartitionFilter`), поэтому стоимость не растёт вместе с таблицей;
-- Workflows: десятки шагов в день;
-- GCS: гигабайты.
+At the current volume (a few hundred files of ~100 KB per day) everything fits in the free tier or costs
+pennies:
+- Cloud Run job: a few minutes per day;
+- BigQuery on-demand: queries filter by partition; the MERGE into silver also touches only the day being processed
+  (`updatePartitionFilter`), so cost does not grow with the table;
+- Workflows: dozens of steps per day;
+- GCS: gigabytes.
 
-Всё равно поставьте бюджет с оповещением, см. [owner-tasks.md](owner-tasks.md).
+Still, set up a budget with alerts, see [owner-tasks.md](owner-tasks.md).
